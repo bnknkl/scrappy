@@ -1,0 +1,6 @@
+## Interface: 100207
+## Title: Scrappy
+## Version: 1.0.0
+## SavedVariables: ScrappyDB
+
+Scrappy.lua
