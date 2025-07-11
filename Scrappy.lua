@@ -230,4 +230,57 @@ f:SetScript("OnEvent", function(self, event, arg)
     end
 end)
 
--- (Slash commands remain the same, not included here for brevity)
+SLASH_SCRAPPY1 = "/scrappy"
+SlashCmdList["SCRAPPY"] = function(msg)
+    msg = msg:lower()
+    local ilvl = ScrappyDB.ilvlThreshold or 0
+
+    local qInput, toggle = msg:match("^quality%s+(%w+)%s+(%w+)$")
+    if qInput and toggle then
+        local q = tonumber(qInput)
+        if not q then
+            q = QUALITY_NAME_TO_ID[qInput:lower()]
+        end
+        if q and ScrappyDB.qualityFilter then
+            if toggle == "sell" then
+                ScrappyDB.qualityFilter[q] = true
+                Print("Set to sell quality " .. q .. " (" .. (QUALITY_NAMES[q] or "?") .. ") items.")
+            elseif toggle == "keep" then
+                ScrappyDB.qualityFilter[q] = false
+                Print("Set to keep quality " .. q .. " (" .. (QUALITY_NAMES[q] or "?") .. ") items.")
+            else
+                Print("Unknown action: " .. toggle .. ". Use 'sell' or 'keep'.")
+            end
+        else
+            Print("Unknown quality: " .. qInput)
+        end
+        return
+    end
+
+    if msg == "auto on" then
+        ScrappyDB.autoSell = true
+        Print("Auto-sell enabled.")
+    elseif msg == "auto off" then
+        ScrappyDB.autoSell = false
+        Print("Auto-sell disabled.")
+    elseif msg:match("^ilvl %d+") then
+        local newIlvl = tonumber(msg:match("^ilvl (%d+)"))
+        ScrappyDB.ilvlThreshold = newIlvl
+        Print("Item level threshold set to " .. newIlvl)
+    elseif msg == "status" then
+        Print("Settings:")
+        Print("  Auto-sell: " .. tostring(ScrappyDB.autoSell))
+        Print("  ilvlThreshold: " .. tostring(ilvl))
+        for q = 0, 4 do
+            local name = QUALITY_NAMES[q] or ("Quality " .. q)
+            local enabled = ScrappyDB.qualityFilter and ScrappyDB.qualityFilter[q] and "sell" or "keep"
+            Print("  Quality " .. q .. " (" .. name .. "): " .. enabled)
+        end
+    else
+        Print("Commands:")
+        Print("  /scrappy auto on|off         - Enable/disable auto-sell")
+        Print("  /scrappy ilvl [number]       - Set ilvl sell threshold")
+        Print("  /scrappy quality [#||name] [sell||keep] - Set quality sell rule")
+        Print("  /scrappy status              - Show current settings")
+    end
+end
