@@ -1,0 +1,15 @@
+## Interface: 100207
+## Title: Scrappy
+## Notes: Auto-sells junk and filtered items
+## Version: 1.0
+## SavedVariables: ScrappyDB
+## IconTexture: Interface\ICONS\INV_Misc_Coin_01
+
+Core.lua
+Cache.lua
+Recovery.lua
+Filters.lua
+Gear.lua
+UI.lua
+SettingsUI.lua
+Config.lua
