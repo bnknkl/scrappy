@@ -1,20 +1,20 @@
 -- UI.lua - User interface components
 
--- WHY: Get reference to our addon namespace
+--  Get reference to our addon namespace
 local Scrappy = _G["Scrappy"]
 
--- WHY: This function creates the sell button on the merchant frame
+--  This function creates the sell button on the merchant frame
 function Scrappy.UI.CreateScrappyButton()
-    -- WHY: Prevent creating multiple buttons
+    --  Prevent creating multiple buttons
     if _G["ScrappySellButton"] then return end
     
-    -- WHY: Validate that MerchantFrame exists
+    --  Validate that MerchantFrame exists
     if not MerchantFrame then
         Scrappy.Print("Error: Could not create sell button - MerchantFrame not found")
         return
     end
 
-    -- WHY: Create the sell button
+    --  Create the sell button
     local button = CreateFrame("Button", "ScrappySellButton", MerchantFrame, "UIPanelButtonTemplate")
     if not button then
         Scrappy.Print("Error: Could not create sell button")
@@ -23,19 +23,19 @@ function Scrappy.UI.CreateScrappyButton()
     
     button:SetSize(32, 32)
     
-    -- WHY: Protected positioning in case MerchantFrameTab2 doesn't exist
+    --  Protected positioning in case MerchantFrameTab2 doesn't exist
     if MerchantFrameTab2 then
         button:SetPoint("LEFT", MerchantFrameTab2, "RIGHT", 10, 0)
     else
         button:SetPoint("BOTTOMRIGHT", MerchantFrame, "BOTTOMRIGHT", -10, 10)
     end
 
-    -- WHY: Add an icon to make the button's purpose clear
+    --  Add an icon to make the button's purpose clear
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
     icon:SetTexture("Interface\\ICONS\\INV_Misc_Coin_01")
 
-    -- WHY: Set up the click handler with error protection
+    --  Set up the click handler with error protection
     button:SetScript("OnClick", function()
         local success, errorMsg = pcall(Scrappy.Core.SellItems)
         if not success then
@@ -43,11 +43,11 @@ function Scrappy.UI.CreateScrappyButton()
         end
     end)
 
-    -- WHY: Show detailed tooltip on hover
+    --  Show detailed tooltip on hover
     button:SetScript("OnEnter", function(self)
         local success, errorMsg = pcall(Scrappy.UI.ShowSellTooltip, self)
         if not success then
-            -- WHY: Fallback tooltip if detailed one fails
+            --  Fallback tooltip if detailed one fails
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText("Sell with Scrappy")
             GameTooltip:AddLine("Error loading item preview", 1, 0, 0)
@@ -55,22 +55,22 @@ function Scrappy.UI.CreateScrappyButton()
         end
     end)
 
-    -- WHY: Hide tooltip when mouse leaves
+    --  Hide tooltip when mouse leaves
     button:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
     
-    -- WHY: Create settings button
+    --  Create settings button
     local settingsButton = CreateFrame("Button", "ScrappySettingsButton", MerchantFrame, "UIPanelButtonTemplate")
     settingsButton:SetSize(32, 32)
     settingsButton:SetPoint("LEFT", button, "RIGHT", 5, 0)
     
-    -- WHY: Settings icon
+    --  Settings icon
     local settingsIcon = settingsButton:CreateTexture(nil, "ARTWORK")
     settingsIcon:SetAllPoints()
     settingsIcon:SetTexture("Interface\\ICONS\\Trade_Engineering")
     
-    -- WHY: Settings button functionality
+    --  Settings button functionality
     settingsButton:SetScript("OnClick", function()
         Scrappy.SettingsUI.Show()
     end)
@@ -87,7 +87,7 @@ function Scrappy.UI.CreateScrappyButton()
     end)
 end
 
--- WHY: Separate function for tooltip logic makes it easier to maintain
+--  Separate function for tooltip logic makes it easier to maintain
 function Scrappy.UI.ShowSellTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:SetText("Sell with Scrappy")
@@ -95,7 +95,7 @@ function Scrappy.UI.ShowSellTooltip(button)
     local items = Scrappy.Core.GetItemsToSell()
     local cacheInfo = items._cacheInfo
     
-    -- WHY: Remove metadata before processing items
+    --  Remove metadata before processing items
     items._cacheInfo = nil
 
     if #items == 0 then
@@ -104,7 +104,7 @@ function Scrappy.UI.ShowSellTooltip(button)
             GameTooltip:AddLine("(" .. cacheInfo.pendingItems .. " items still loading)", 0.7, 0.7, 0.7)
         end
         
-        -- WHY: Show threshold info even when no items to sell
+        --  Show threshold info even when no items to sell
         if ScrappyDB.autoThreshold then
             local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
             GameTooltip:AddLine(" ", 1, 1, 1) -- Spacer
@@ -115,7 +115,7 @@ function Scrappy.UI.ShowSellTooltip(button)
             GameTooltip:AddLine("Manual threshold: " .. ScrappyDB.ilvlThreshold, 0.7, 0.7, 1)
         end
         
-        -- WHY: Show consumable protection status
+        --  Show consumable protection status
         GameTooltip:AddLine(" ", 1, 1, 1) -- Spacer
         if ScrappyDB.sellConsumables then
             GameTooltip:AddLine("Consumables: CAN BE SOLD", 1, 0.5, 0.5)
@@ -124,14 +124,14 @@ function Scrappy.UI.ShowSellTooltip(button)
         end
         GameTooltip:AddLine("Profession Tools: PROTECTED", 0.5, 1, 0.5)
     else
-        -- WHY: Show selling status if operation is in progress
+        --  Show selling status if operation is in progress
         local sellStatus = Scrappy.Recovery.GetSellStatus()
         if sellStatus.inProgress then
             GameTooltip:AddLine("Selling in progress...", 1, 1, 0)
             GameTooltip:AddLine(sellStatus.queuedItems .. " items remaining", 0.7, 0.7, 0.7)
         end
         
-        -- WHY: Group items by quality for better organization
+        --  Group items by quality for better organization
         local groups = {}
         for _, item in ipairs(items) do
             local quality = item.quality or 0
@@ -139,11 +139,11 @@ function Scrappy.UI.ShowSellTooltip(button)
             table.insert(groups[quality], item)
         end
 
-        -- WHY: Show items organized by quality, sorted by item level
+        --  Show items organized by quality, sorted by item level
         for quality = 0, 4 do
             local group = groups[quality]
             if group then
-                -- WHY: Sort by item level within each quality group
+                --  Sort by item level within each quality group
                 table.sort(group, function(a, b)
                     return (tonumber(a.ilvl) or 0) < (tonumber(b.ilvl) or 0)
                 end)
@@ -160,13 +160,13 @@ function Scrappy.UI.ShowSellTooltip(button)
             end
         end
         
-        -- WHY: Show cache status if there are pending items
+        --  Show cache status if there are pending items
         if cacheInfo and cacheInfo.pendingItems > 0 then
             GameTooltip:AddLine(" ", 1, 1, 1) -- Spacer
             GameTooltip:AddLine("(" .. cacheInfo.pendingItems .. " items still loading)", 0.7, 0.7, 0.7)
         end
         
-        -- WHY: Show failed items if any
+        --  Show failed items if any
         if sellStatus.failedItems > 0 then
             GameTooltip:AddLine(" ", 1, 1, 1) -- Spacer
             GameTooltip:AddLine(sellStatus.failedItems .. " items failed to sell", 1, 0.5, 0.5)

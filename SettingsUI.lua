@@ -1,14 +1,11 @@
--- SettingsUI.lua - Graphical settings interface with tabbed layout
+-- SettingsUI.lua - Settings interface with tabs
 
--- WHY: Get reference to our addon namespace
 local Scrappy = _G["Scrappy"]
 
--- WHY: Ensure SettingsUI module exists
 if not Scrappy.SettingsUI then
     Scrappy.SettingsUI = {}
 end
 
--- WHY: Local references to avoid dependency issues
 local QUALITY_NAMES = {
     [0] = "Junk",
     [1] = "Common", 
@@ -25,30 +22,25 @@ local QUALITY_COLORS = {
     [4] = {r=0.64, g=0.21, b=0.93}
 }
 
--- WHY: Current maximum item level in the game
 local CURRENT_MAX_ILVL = 717
 
--- WHY: Tab definitions
 local TABS = {
     {id = "general", name = "General", icon = "Interface\\ICONS\\Trade_Engineering"},
     {id = "filters", name = "Filters", icon = "Interface\\ICONS\\INV_Misc_Gear_01"},
     {id = "protections", name = "Protections", icon = "Interface\\ICONS\\Spell_Holy_DivineProtection"}
 }
 
--- WHY: Currently active tab
 local activeTab = "general"
 
--- WHY: Create the main settings frame
+-- Create main settings frame
 local function CreateSettingsFrame()
     local frame = CreateFrame("Frame", "ScrappySettingsFrame", UIParent, "BackdropTemplate")
     frame.name = "Scrappy"
     frame:Hide()
     
-    -- WHY: Make it larger to accommodate tabs
     frame:SetSize(700, 650)
     frame:SetPoint("CENTER")
     
-    -- WHY: Add background using modern backdrop API
     frame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -57,19 +49,17 @@ local function CreateSettingsFrame()
     })
     frame:SetBackdropColor(0, 0, 0, 1)
     
-    -- WHY: Make it movable
+    -- Make it draggable
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     
-    -- WHY: Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetText("Scrappy Settings")
     
-    -- WHY: Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
     closeBtn:SetScript("OnClick", function() frame:Hide() end)
@@ -77,20 +67,19 @@ local function CreateSettingsFrame()
     return frame
 end
 
--- WHY: Create tab buttons
+-- Create tab buttons
 local function CreateTabButtons(parent)
     local tabs = {}
     local tabWidth = 120
     local tabHeight = 32
-    local totalWidth = (#TABS * tabWidth) + ((#TABS - 1) * 5)  -- Total width including spacing
-    local startX = (700 - totalWidth) / 2  -- Center the tabs in the 700px wide frame
+    local totalWidth = (#TABS * tabWidth) + ((#TABS - 1) * 5)
+    local startX = (700 - totalWidth) / 2
     
     for i, tabInfo in ipairs(TABS) do
         local tab = CreateFrame("Button", nil, parent, "BackdropTemplate")
         tab:SetSize(tabWidth, tabHeight)
         tab:SetPoint("TOPLEFT", parent, "TOPLEFT", startX + (i-1) * (tabWidth + 5), -50)
         
-        -- WHY: Tab backdrop
         tab:SetBackdrop({
             bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
             edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -98,23 +87,19 @@ local function CreateTabButtons(parent)
             insets = { left = 3, right = 3, top = 3, bottom = 3 }
         })
         
-        -- WHY: Tab icon
         local icon = tab:CreateTexture(nil, "ARTWORK")
         icon:SetSize(16, 16)
         icon:SetPoint("LEFT", tab, "LEFT", 8, 0)
         icon:SetTexture(tabInfo.icon)
         
-        -- WHY: Tab text
         local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("LEFT", icon, "RIGHT", 5, 0)
         text:SetText(tabInfo.name)
         
-        -- WHY: Tab click handler
         tab:SetScript("OnClick", function()
             Scrappy.SettingsUI.SwitchTab(tabInfo.id)
         end)
         
-        -- WHY: Hover effects
         tab:SetScript("OnEnter", function(self)
             if activeTab ~= tabInfo.id then
                 self:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
@@ -135,7 +120,7 @@ local function CreateTabButtons(parent)
     return tabs
 end
 
--- WHY: Create content area for tab content
+-- Create content area for tab content
 local function CreateContentArea(parent)
     local content = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     content:SetPoint("TOPLEFT", parent, "TOPLEFT", 20, -90)
@@ -153,25 +138,24 @@ local function CreateContentArea(parent)
     return content
 end
 
--- WHY: Helper functions for UI elements
 local function CreateCheckbox(parent, name, tooltip, point, relativeFrame, relativePoint, x, y)
-    local checkbox = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
-    checkbox:SetPoint(point, relativeFrame, relativePoint, x, y)
-    checkbox.Text:SetText(name)
+    local cb = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
+    cb:SetPoint(point, relativeFrame, relativePoint, x, y)
+    cb.Text:SetText(name)
     
     if tooltip then
-        checkbox.tooltipText = tooltip
-        checkbox:SetScript("OnEnter", function(self)
+        cb.tooltipText = tooltip
+        cb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(self.tooltipText)
             GameTooltip:Show()
         end)
-        checkbox:SetScript("OnLeave", function()
+        cb:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
     end
     
-    return checkbox
+    return cb
 end
 
 local function CreateSlider(parent, name, tooltip, minVal, maxVal, point, relativeFrame, relativePoint, x, y)
@@ -181,7 +165,6 @@ local function CreateSlider(parent, name, tooltip, minVal, maxVal, point, relati
     slider:SetValueStep(1)
     slider:SetObeyStepOnDrag(true)
     
-    -- WHY: Title and value display
     slider.title = slider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     slider.title:SetPoint("BOTTOM", slider, "TOP", 0, 5)
     slider.title:SetText(name)
@@ -189,7 +172,7 @@ local function CreateSlider(parent, name, tooltip, minVal, maxVal, point, relati
     slider.valueText = slider:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     slider.valueText:SetPoint("TOP", slider.title, "BOTTOM", 0, -5)
     
-    -- WHY: Remove the default low/high labels
+    -- Hide default labels  
     if slider.Low then slider.Low:Hide() end
     if slider.High then slider.High:Hide() end
     
@@ -209,56 +192,55 @@ local function CreateSlider(parent, name, tooltip, minVal, maxVal, point, relati
 end
 
 local function CreateButton(parent, text, tooltip, point, relativeFrame, relativePoint, x, y, width, height)
-    local button = CreateFrame("Button", nil, parent, "GameMenuButtonTemplate")
-    button:SetSize(width or 120, height or 25)
-    button:SetPoint(point, relativeFrame, relativePoint, x, y)
-    button:SetText(text)
+    local btn = CreateFrame("Button", nil, parent, "GameMenuButtonTemplate")
+    btn:SetSize(width or 120, height or 25)
+    btn:SetPoint(point, relativeFrame, relativePoint, x, y)
+    btn:SetText(text)
     
     if tooltip then
-        button.tooltipText = tooltip
-        button:SetScript("OnEnter", function(self)
+        btn.tooltipText = tooltip
+        btn:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(self.tooltipText)
             GameTooltip:Show()
         end)
-        button:SetScript("OnLeave", function()
+        btn:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
     end
     
-    return button
+    return btn
 end
 
 local function CreateDropdown(parent, name, tooltip, point, relativeFrame, relativePoint, x, y)
-    local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
-    dropdown:SetPoint(point, relativeFrame, relativePoint, x, y)
+    local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
+    dd:SetPoint(point, relativeFrame, relativePoint, x, y)
     
-    -- WHY: Title
-    dropdown.title = dropdown:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    dropdown.title:SetPoint("BOTTOMLEFT", dropdown, "TOPLEFT", 16, 3)
-    dropdown.title:SetText(name)
+    dd.title = dd:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    dd.title:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 16, 3)
+    dd.title:SetText(name)
     
     if tooltip then
-        dropdown.tooltipText = tooltip
-        dropdown:SetScript("OnEnter", function(self)
+        dd.tooltipText = tooltip
+        dd:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(self.tooltipText)
             GameTooltip:Show()
         end)
-        dropdown:SetScript("OnLeave", function()
+        dd:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
     end
     
-    return dropdown
+    return dd
 end
 
--- WHY: Create General tab content
+--  Create General tab content
 local function CreateGeneralTab(parent)
     local container = CreateFrame("Frame", nil, parent)
     container:SetAllPoints()
     
-    -- WHY: Auto-sell checkbox
+    --  Auto-sell checkbox
     local autoSellCheck = CreateCheckbox(container, "Enable Auto-Sell", 
         "Automatically sell items when visiting a vendor", 
         "TOPLEFT", container, "TOPLEFT", 20, -20)
@@ -268,7 +250,7 @@ local function CreateGeneralTab(parent)
         Scrappy.QuietPrint("Auto-sell " .. (ScrappyDB.autoSell and "enabled" or "disabled"))
     end)
     
-    -- WHY: Quiet mode checkbox
+    --  Quiet mode checkbox
     local quietModeCheck = CreateCheckbox(container, "Quiet Mode", 
         "Reduce chat messages when making changes in the UI", 
         "TOPLEFT", autoSellCheck, "BOTTOMLEFT", 0, -10)
@@ -278,7 +260,7 @@ local function CreateGeneralTab(parent)
         Scrappy.Print("Quiet mode " .. (ScrappyDB.quietMode and "enabled - UI changes will be silent" or "disabled - UI changes will show messages"))
     end)
     
-    -- WHY: Auto-confirm soulbound dialogs
+    --  Auto-confirm soulbound dialogs
     local autoConfirmCheck = CreateCheckbox(container, "Auto-Confirm Soulbound Dialogs", 
         "Automatically confirm 'item will become soulbound' dialogs during selling for smoother operation.", 
         "TOPLEFT", quietModeCheck, "BOTTOMLEFT", 0, -10)
@@ -288,18 +270,18 @@ local function CreateGeneralTab(parent)
         Scrappy.QuietPrint("Auto-confirm soulbound dialogs " .. (ScrappyDB.autoConfirmSoulbound and "enabled" or "disabled"))
     end)
     
-    -- WHY: Auto-threshold section
+    --  Auto-threshold section
     local thresholdTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     thresholdTitle:SetPoint("TOPLEFT", autoConfirmCheck, "BOTTOMLEFT", 0, -30)
     thresholdTitle:SetText("Item Level Thresholds")
     thresholdTitle:SetTextColor(1, 0.82, 0)
     
-    -- WHY: Auto-threshold checkbox
+    --  Auto-threshold checkbox
     local autoThresholdCheck = CreateCheckbox(container, "Auto Item Level Threshold", 
         "Automatically set sell threshold based on your equipped gear", 
         "TOPLEFT", thresholdTitle, "BOTTOMLEFT", 0, -10)
     
-    -- WHY: Manual ilvl threshold slider
+    --  Manual ilvl threshold slider
     local ilvlSlider = CreateSlider(container, "Manual Item Level Threshold", 
         "Sell items with item level at or below this value (0 = disabled)", 
         0, CURRENT_MAX_ILVL, "TOPLEFT", autoThresholdCheck, "BOTTOMLEFT", 0, -50)
@@ -312,7 +294,7 @@ local function CreateGeneralTab(parent)
         end
     end)
     
-    -- WHY: Set up auto-threshold checkbox script after slider is created
+    --  Set up auto-threshold checkbox script after slider is created
     autoThresholdCheck:SetScript("OnClick", function(self)
         if self:GetChecked() then
             if Scrappy.Gear and Scrappy.Gear.EnableAutoThreshold then
@@ -322,7 +304,7 @@ local function CreateGeneralTab(parent)
                 Scrappy.QuietPrint("Auto-threshold enabled (gear module not loaded)")
             end
             
-            -- WHY: Update slider to show current equipped average when auto-threshold is enabled
+            --  Update slider to show current equipped average when auto-threshold is enabled
             if Scrappy.Gear and Scrappy.Gear.GetEquippedAverageItemLevel then
                 local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
                 ilvlSlider:SetValue(math.floor(avgIlvl))
@@ -338,10 +320,10 @@ local function CreateGeneralTab(parent)
         Scrappy.SettingsUI.RefreshUI()
     end)
     
-    -- WHY: Auto-threshold offset slider
+    --  Auto-threshold offset slider
     local offsetSlider = CreateSlider(container, "Auto-Threshold Offset", 
         "How many item levels below your average equipped ilvl to set the threshold", 
-        -50, 0, "TOPLEFT", ilvlSlider, "BOTTOMLEFT", 0, -25)
+        -50, 0, "TOPLEFT", ilvlSlider, "BOTTOMLEFT", 0, -70)
     
     offsetSlider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value)
@@ -352,19 +334,19 @@ local function CreateGeneralTab(parent)
         end
     end)
     
-    -- WHY: Selling order section
+    --  Selling order section
     local orderTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    orderTitle:SetPoint("TOPLEFT", autoSellCheck, "TOPRIGHT", 100, -5)
+    orderTitle:SetPoint("TOPLEFT", offsetSlider, "BOTTOMLEFT", 0, -50)
     orderTitle:SetTextColor(1, 0.82, 0)
     
-    -- WHY: Selling order dropdown
+    --  Selling order dropdown
     local orderDropdown = CreateDropdown(container, "Selling Order", 
-        "Order in which items are sold - affects buyback window in case of oopsies.",
-        "TOPLEFT", orderTitle, "TOPRIGHT", 100, -10)
+        "Order in which items are sold - affects buyback window priority",
+        "TOPLEFT", autoSellCheck, "TOPRIGHT", 200, -5)
     
-    -- WHY: Initialize dropdown
+    --  Initialize dropdown
     UIDropDownMenu_SetWidth(orderDropdown, 200)
-    UIDropDownMenu_SetText(orderDropdown, "Bag Order (default)")
+    UIDropDownMenu_SetText(orderDropdown, "Default Order")
     
     UIDropDownMenu_Initialize(orderDropdown, function(self, level)
         local info = UIDropDownMenu_CreateInfo()
@@ -374,7 +356,7 @@ local function CreateGeneralTab(parent)
         info.value = "default"
         info.func = function()
             ScrappyDB.sellOrder = "default"
-            UIDropDownMenu_SetText(orderDropdown, "Bag Order (default)")
+            UIDropDownMenu_SetText(orderDropdown, "Default Order")
             Scrappy.QuietPrint("Selling order: Default (bag order)")
         end
         info.checked = (ScrappyDB.sellOrder == "default" or not ScrappyDB.sellOrder)
@@ -403,11 +385,11 @@ local function CreateGeneralTab(parent)
         UIDropDownMenu_AddButton(info)
     end)
     
-    -- WHY: Action buttons
+    --  Action buttons
     local buttonY = -350  -- Restored to original position since selling order moved to right column
     -- Buttons moved to main frame - see CreateUI function
     
-    -- WHY: Store references for refreshing
+    --  Store references for refreshing
     container.autoSellCheck = autoSellCheck
     container.quietModeCheck = quietModeCheck
     container.autoConfirmCheck = autoConfirmCheck
@@ -419,12 +401,12 @@ local function CreateGeneralTab(parent)
     return container
 end
 
--- WHY: Create Filters tab content
+--  Create Filters tab content
 local function CreateFiltersTab(parent)
     local container = CreateFrame("Frame", nil, parent)
     container:SetAllPoints()
     
-    -- WHY: Quality filters section
+    --  Quality filters section
     local qualityTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     qualityTitle:SetPoint("TOPLEFT", container, "TOPLEFT", 20, -20)
     qualityTitle:SetText("Quality Filters")
@@ -446,7 +428,7 @@ local function CreateFiltersTab(parent)
             "Allow selling " .. qualityName .. " quality items",
             "TOPLEFT", container, "TOPLEFT", 40, yOffset)
         
-        -- WHY: Color the text
+        --  Color the text
         check.Text:SetTextColor(color.r, color.g, color.b)
         
         check:SetScript("OnClick", function(self)
@@ -461,7 +443,7 @@ local function CreateFiltersTab(parent)
         yOffset = yOffset - 30
     end
     
-    -- WHY: Action buttons
+    --  Action buttons
     local scanButton = CreateButton(container, "Scan Materials", 
         "Scan your bags to see what crafting materials you have",
         "BOTTOMLEFT", container, "BOTTOMLEFT", 20, 20, 140, 25)
@@ -488,12 +470,12 @@ local function CreateFiltersTab(parent)
     return container
 end
 
--- WHY: Create Protections tab content
+--  Create Protections tab content
 local function CreateProtectionsTab(parent)
     local container = CreateFrame("Frame", nil, parent)
     container:SetAllPoints()
     
-    -- WHY: Always-on protections section
+    --  Always-on protections section
     local alwaysTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     alwaysTitle:SetPoint("TOPLEFT", container, "TOPLEFT", 20, -20)
     alwaysTitle:SetText("Always Protected")
@@ -504,21 +486,21 @@ local function CreateProtectionsTab(parent)
     alwaysDesc:SetText("These items are always protected and cannot be sold:")
     alwaysDesc:SetTextColor(0.8, 0.8, 0.8)
     
-    -- WHY: Consumable protection (always checked, disabled)
+    --  Consumable protection (always checked, disabled)
     local consumableCheck = CreateCheckbox(container, "Consumables (Flasks, Potions, Food)", 
         "Prevents selling flasks, potions, food, etc. This protection cannot be disabled for safety.", 
         "TOPLEFT", alwaysDesc, "BOTTOMLEFT", 0, -15)
     consumableCheck:SetChecked(true)
     consumableCheck:Disable()
     
-    -- WHY: Profession equipment protection (always checked, disabled)
+    --  Profession equipment protection (always checked, disabled)
     local professionCheck = CreateCheckbox(container, "Profession Equipment (Tools, Mining Picks, etc.)", 
         "Prevents selling profession tools, mining picks, skinning knives, etc. This protection cannot be disabled for safety.", 
         "TOPLEFT", consumableCheck, "BOTTOMLEFT", 0, -10)
     professionCheck:SetChecked(true)
     professionCheck:Disable()
     
-    -- WHY: Optional protections section
+    --  Optional protections section
     local optionalTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     optionalTitle:SetPoint("TOPLEFT", professionCheck, "BOTTOMLEFT", 0, -30)
     optionalTitle:SetText("Optional Protections")
@@ -529,7 +511,7 @@ local function CreateProtectionsTab(parent)
     optionalDesc:SetText("These protections can be toggled on or off:")
     optionalDesc:SetTextColor(0.8, 0.8, 0.8)
     
-    -- WHY: Warbound until equipped protection (toggleable)
+    --  Warbound until equipped protection (toggleable)
     local warboundCheck = CreateCheckbox(container, "Protect Warbound until Equipped Items", 
         "Prevents selling items marked 'Warbound until equipped' - valuable for gearing alts.", 
         "TOPLEFT", optionalDesc, "BOTTOMLEFT", 0, -15)
@@ -539,7 +521,7 @@ local function CreateProtectionsTab(parent)
         Scrappy.QuietPrint("Warbound protection " .. (ScrappyDB.protectWarbound and "enabled" or "disabled"))
     end)
     
-    -- WHY: Token protection (toggleable)
+    --  Token protection (toggleable)
     local tokenCheck = CreateCheckbox(container, "Protect Gear Tokens and Set Pieces", 
         "Prevents selling tier tokens, set piece tokens, and other gear upgrade items.", 
         "TOPLEFT", warboundCheck, "BOTTOMLEFT", 0, -10)
@@ -549,7 +531,7 @@ local function CreateProtectionsTab(parent)
         Scrappy.QuietPrint("Token protection " .. (ScrappyDB.protectTokens and "enabled" or "disabled"))
     end)
     
-    -- WHY: Material protections section
+    --  Material protections section
     local materialTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     materialTitle:SetPoint("TOPLEFT", tokenCheck, "BOTTOMLEFT", 0, -30)
     materialTitle:SetText("Crafting Material Protection")
@@ -577,7 +559,7 @@ local function CreateProtectionsTab(parent)
         {key = "classic", name = "Classic"}
     }
     
-    -- WHY: Create two columns for better space usage
+    --  Create two columns for better space usage
     local leftColumn = {}
     local rightColumn = {}
     
@@ -589,7 +571,7 @@ local function CreateProtectionsTab(parent)
         end
     end
     
-    -- WHY: Left column
+    --  Left column
     local currentY = yOffset
     for i, expansion in ipairs(leftColumn) do
         local check = CreateCheckbox(container, expansion.name, 
@@ -605,7 +587,7 @@ local function CreateProtectionsTab(parent)
         currentY = currentY - 25
     end
     
-    -- WHY: Right column
+    --  Right column
     currentY = yOffset
     for i, expansion in ipairs(rightColumn) do
         local check = CreateCheckbox(container, expansion.name, 
@@ -627,14 +609,14 @@ local function CreateProtectionsTab(parent)
     return container
 end
 
--- WHY: Switch between tabs
+--  Switch between tabs
 function Scrappy.SettingsUI.SwitchTab(tabId)
     local frame = _G["ScrappySettingsFrame"]
     if not frame then return end
     
     activeTab = tabId
     
-    -- WHY: Update tab appearances
+    --  Update tab appearances
     for id, tab in pairs(frame.tabs) do
         if id == tabId then
             tab:SetBackdropColor(0.2, 0.4, 0.8, 1)
@@ -645,12 +627,12 @@ function Scrappy.SettingsUI.SwitchTab(tabId)
         end
     end
     
-    -- WHY: Hide all tab content
+    --  Hide all tab content
     if frame.generalTab then frame.generalTab:Hide() end
     if frame.filtersTab then frame.filtersTab:Hide() end
     if frame.protectionsTab then frame.protectionsTab:Hide() end
     
-    -- WHY: Show active tab content
+    --  Show active tab content
     if tabId == "general" and frame.generalTab then
         frame.generalTab:Show()
     elseif tabId == "filters" and frame.filtersTab then
@@ -659,26 +641,26 @@ function Scrappy.SettingsUI.SwitchTab(tabId)
         frame.protectionsTab:Show()
     end
     
-    -- WHY: Refresh UI to update values
+    --  Refresh UI to update values
     Scrappy.SettingsUI.RefreshUI()
 end
 
--- WHY: Create the complete tabbed UI
+--  Create the complete tabbed UI
 function Scrappy.SettingsUI.CreateUI()
     local frame = CreateSettingsFrame()
     
-    -- WHY: Create tab buttons
+    --  Create tab buttons
     frame.tabs = CreateTabButtons(frame)
     
-    -- WHY: Create content area
+    --  Create content area
     frame.content = CreateContentArea(frame)
     
-    -- WHY: Create tab content
+    --  Create tab content
     frame.generalTab = CreateGeneralTab(frame.content)
     frame.filtersTab = CreateFiltersTab(frame.content)
     frame.protectionsTab = CreateProtectionsTab(frame.content)
     
-    -- WHY: Create action buttons outside of tabs (always visible and centered)
+    --  Create action buttons outside of tabs (always visible and centered)
     local buttonWidths = {120, 120, 140}  -- Test Selling, Analyze Gear, Reset to Defaults
     local buttonSpacing = 10
     local totalButtonWidth = buttonWidths[1] + buttonWidths[2] + buttonWidths[3] + (buttonSpacing * 2)
@@ -713,31 +695,31 @@ function Scrappy.SettingsUI.CreateUI()
         Scrappy.SettingsUI.ResetToDefaults()
     end)
     
-    -- WHY: Initially hide all tabs except general
+    --  Initially hide all tabs except general
     frame.filtersTab:Hide()
     frame.protectionsTab:Hide()
     
-    -- WHY: Set initial active tab
+    --  Set initial active tab
     Scrappy.SettingsUI.SwitchTab("general")
     
     return frame
 end
 
--- WHY: Refresh UI to match current settings
+--  Refresh UI to match current settings
 function Scrappy.SettingsUI.RefreshUI()
     local frame = _G["ScrappySettingsFrame"]
     if not frame or not ScrappyDB then return end
     
-    -- WHY: Refresh General tab
+    --  Refresh General tab
     if frame.generalTab then
         frame.generalTab.autoSellCheck:SetChecked(ScrappyDB.autoSell or false)
         frame.generalTab.quietModeCheck:SetChecked(ScrappyDB.quietMode or false)
         frame.generalTab.autoConfirmCheck:SetChecked(ScrappyDB.autoConfirmSoulbound ~= false)
         frame.generalTab.autoThresholdCheck:SetChecked(ScrappyDB.autoThreshold or false)
         
-        -- WHY: Update sliders
+        --  Update sliders
         if ScrappyDB.autoThreshold then
-            -- WHY: When auto-threshold is on, show the current equipped average
+            --  When auto-threshold is on, show the current equipped average
             if Scrappy.Gear and Scrappy.Gear.GetEquippedAverageItemLevel then
                 local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
                 frame.generalTab.ilvlSlider:SetValue(math.floor(avgIlvl))
@@ -745,7 +727,7 @@ function Scrappy.SettingsUI.RefreshUI()
                 frame.generalTab.ilvlSlider:SetValue(ScrappyDB.ilvlThreshold or 0)
             end
         else
-            -- WHY: When auto-threshold is off, show the manual setting
+            --  When auto-threshold is off, show the manual setting
             frame.generalTab.ilvlSlider:SetValue(ScrappyDB.ilvlThreshold or 0)
         end
         
@@ -760,7 +742,7 @@ function Scrappy.SettingsUI.RefreshUI()
                                              ScrappyDB.autoThreshold and 1 or 0.5, 
                                              ScrappyDB.autoThreshold and 1 or 0.5)
         
-        -- WHY: Update selling order dropdown
+        --  Update selling order dropdown
         if frame.generalTab.orderDropdown then
             local orderText = "Default Order"
             if ScrappyDB.sellOrder == "value" then
@@ -772,7 +754,7 @@ function Scrappy.SettingsUI.RefreshUI()
         end
     end
     
-    -- WHY: Refresh Filters tab
+    --  Refresh Filters tab
     if frame.filtersTab and frame.filtersTab.qualityChecks then
         for quality = 0, 4 do
             if frame.filtersTab.qualityChecks[quality] then
@@ -782,9 +764,9 @@ function Scrappy.SettingsUI.RefreshUI()
         end
     end
     
-    -- WHY: Refresh Protections tab
+    --  Refresh Protections tab
     if frame.protectionsTab then
-        -- WHY: Update Warbound and Token protection checkboxes
+        --  Update Warbound and Token protection checkboxes
         if frame.protectionsTab.warboundCheck then
             frame.protectionsTab.warboundCheck:SetChecked(ScrappyDB.protectWarbound or false)
         end
@@ -792,7 +774,7 @@ function Scrappy.SettingsUI.RefreshUI()
             frame.protectionsTab.tokenCheck:SetChecked(ScrappyDB.protectTokens or false)
         end
         
-        -- WHY: Update material protection checkboxes
+        --  Update material protection checkboxes
         if frame.protectionsTab.materialChecks then
             for expansion, check in pairs(frame.protectionsTab.materialChecks) do
                 local enabled = ScrappyDB.materialFilters and ScrappyDB.materialFilters[expansion]
@@ -802,7 +784,7 @@ function Scrappy.SettingsUI.RefreshUI()
     end
 end
 
--- WHY: Reset settings to safe defaults
+--  Reset settings to safe defaults
 function Scrappy.SettingsUI.ResetToDefaults()
     ScrappyDB.autoSell = false
     ScrappyDB.quietMode = false
@@ -833,13 +815,13 @@ function Scrappy.SettingsUI.ResetToDefaults()
     Scrappy.SettingsUI.RefreshUI()
 end
 
--- WHY: Test function to verify module is working
+--  Test function to verify module is working
 function Scrappy.SettingsUI.Test()
     Scrappy.Print("SettingsUI.Test() called successfully!")
     return true
 end
 
--- WHY: Show the settings UI
+--  Show the settings UI
 function Scrappy.SettingsUI.Show()
     local frame = _G["ScrappySettingsFrame"]
     if not frame then
@@ -850,7 +832,7 @@ function Scrappy.SettingsUI.Show()
     frame:Show()
 end
 
--- WHY: Hide the settings UI
+--  Hide the settings UI
 function Scrappy.SettingsUI.Hide()
     local frame = _G["ScrappySettingsFrame"]
     if frame then

@@ -1,40 +1,40 @@
--- WHY: Debug module loading
+--  Debug module loading
         if msg == "modules" then
             Scrappy.Config.DebugModules()
             return
         end-- Config.lua - Settings management and slash commands
 
--- WHY: Get reference to our addon namespace
+--  Get reference to our addon namespace
 local Scrappy = _G["Scrappy"]
 
--- WHY: Main slash command handler
+--  Main slash command handler
 function Scrappy.Config.HandleSlashCommand(msg)
-    -- WHY: Validate database exists
+    --  Validate database exists
     if not ScrappyDB then
         Scrappy.Print("Error: Settings not loaded yet. Try again in a moment.")
         return
     end
     
-    -- WHY: Protect against nil input
+    --  Protect against nil input
     msg = (msg or ""):lower()
     
-    -- WHY: Wrap command parsing in protected call
+    --  Wrap command parsing in protected call
     local success, errorMsg = pcall(function()
-        -- WHY: Parse quality commands (e.g., "/scrappy quality rare sell")
+        --  Parse quality commands (e.g., "/scrappy quality rare sell")
         local qualityInput, toggle = msg:match("^quality%s+(%w+)%s+(%w+)$")
         if qualityInput and toggle then
             Scrappy.Config.HandleQualityCommand(qualityInput, toggle)
             return
         end
         
-        -- WHY: Parse material filter commands (e.g., "/scrappy materials legion protect")
+        --  Parse material filter commands (e.g., "/scrappy materials legion protect")
         local expansion, materialToggle = msg:match("^materials%s+(%w+)%s+(%w+)$")
         if expansion and materialToggle then
             Scrappy.Config.HandleMaterialCommand(expansion, materialToggle)
             return
         end
         
-        -- WHY: Add item to classification override
+        --  Add item to classification override
         local overrideMatch = msg:match("^override%s+(%d+)%s+(%w+)%s+(%w+)$")
         if overrideMatch then
             local itemID, expansion, materialType = overrideMatch:match("(%d+)%s+(%w+)%s+(%w+)")
@@ -42,7 +42,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Parse simple on/off commands
+        --  Parse simple on/off commands
         if msg == "auto on" then
             ScrappyDB.autoSell = true
             Scrappy.Print("Auto-sell enabled.")
@@ -53,7 +53,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Parse consumable selling commands
+        --  Parse consumable selling commands
         if msg == "consumables on" then
             ScrappyDB.sellConsumables = true
             Scrappy.Print("Consumable selling enabled. |cffff0000WARNING:|r Flasks, potions, and food can now be sold!")
@@ -75,7 +75,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
 
-        -- WHY: Parse token protection commands
+        --  Parse token protection commands
         if msg == "tokens on" then
             ScrappyDB.protectTokens = true
             Scrappy.Print("Token protection enabled. Gear tokens and set pieces will not be sold.")
@@ -86,7 +86,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
 
-        -- WHY: Parse selling order commands
+        --  Parse selling order commands
         if msg == "order default" then
             ScrappyDB.sellOrder = "default"
             Scrappy.Print("Selling order set to: Default (bag order)")
@@ -101,12 +101,12 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
 
-        -- WHY: Parse item level threshold commands
+        --  Parse item level threshold commands
         local ilvlMatch = msg:match("^ilvl%s+(%d+)$")
         if ilvlMatch then
             local newIlvl = tonumber(ilvlMatch)
             if newIlvl and newIlvl >= 0 and newIlvl <= 1000 then
-                -- WHY: Disable auto-threshold when manually setting ilvl
+                --  Disable auto-threshold when manually setting ilvl
                 ScrappyDB.autoThreshold = false
                 ScrappyDB.ilvlThreshold = newIlvl
                 Scrappy.Print("Item level threshold set to " .. newIlvl .. " (auto-threshold disabled)")
@@ -116,7 +116,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Parse auto-threshold commands
+        --  Parse auto-threshold commands
         local autoThresholdCmd, autoThresholdArg = msg:match("^autothreshold%s+(%w+)%s*([%d%-]*)")
         if autoThresholdCmd then
             if autoThresholdCmd == "on" then
@@ -130,7 +130,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Show settings UI
+        --  Show settings UI
         if msg == "config" or msg == "settings" then
             if Scrappy.SettingsUI and Scrappy.SettingsUI.Show then
                 local success, err = pcall(Scrappy.SettingsUI.Show)
@@ -143,67 +143,67 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Show gear analysis
+        --  Show gear analysis
         if msg == "gear" then
             Scrappy.Gear.ShowGearAnalysis()
             return
         end
         
-        -- WHY: Show current settings
+        --  Show current settings
         if msg == "status" then
             Scrappy.Config.ShowStatus()
             return
         end
         
-        -- WHY: Retry failed selling operations
+        --  Retry failed selling operations
         if msg == "retry" then
             Scrappy.Recovery.RetryFailedSells()
             return
         end
         
-        -- WHY: Cancel ongoing selling
+        --  Cancel ongoing selling
         if msg == "cancel" then
             Scrappy.Recovery.CancelSelling()
             return
         end
         
-        -- WHY: Show cache statistics
+        --  Show cache statistics
         if msg == "cache" then
             Scrappy.Config.ShowCacheStats()
             return
         end
         
-        -- WHY: Show what materials player has
+        --  Show what materials player has
         if msg == "scan" then
             Scrappy.Config.ScanMaterials()
             return
         end
         
-        -- WHY: Quick scan - only show cached materials
+        --  Quick scan - only show cached materials
         if msg == "quickscan" then
             Scrappy.Config.QuickScanMaterials()
             return
         end
         
-        -- WHY: Pre-cache items for better performance
+        --  Pre-cache items for better performance
         if msg == "precache" then
             Scrappy.Filters.PreCacheItems()
             return
         end
         
-        -- WHY: Test what would be sold
+        --  Test what would be sold
         if msg == "testsell" then
             Scrappy.Config.TestSelling()
             return
         end
         
-        -- WHY: Manual sell command
+        --  Manual sell command
         if msg == "sell" then
             Scrappy.Core.SellItems()
             return
         end
         
-        -- WHY: Test classification on specific item
+        --  Test classification on specific item
         local testMatch = msg:match("^test%s+(%d+)$")
         if testMatch then
             local itemID = tonumber(testMatch)
@@ -211,13 +211,13 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Debug item classes
+        --  Debug item classes
         if msg == "debug" then
             Scrappy.Config.DebugItemClasses()
             return
         end
         
-        -- WHY: Test dialog handling
+        --  Test dialog handling
         if msg == "testdialog" then
             Scrappy.Print("Testing dialog auto-confirm...")
             Scrappy.Print("AutoConfirmSoulbound setting: " .. tostring(ScrappyDB.autoConfirmSoulbound))
@@ -225,7 +225,7 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Test SettingsUI module
+        --  Test SettingsUI module
         if msg == "testui" then
             if Scrappy.SettingsUI and Scrappy.SettingsUI.Test then
                 Scrappy.SettingsUI.Test()
@@ -235,13 +235,13 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
-        -- WHY: Emergency stop
+        --  Emergency stop
         if msg == "stop" then
             Scrappy.Recovery.EmergencyStop()
             return
         end
         
-        -- WHY: Default case - show help
+        --  Default case - show help
         Scrappy.Config.ShowHelp()
     end)
     
@@ -251,27 +251,27 @@ function Scrappy.Config.HandleSlashCommand(msg)
     end
 end
 
--- WHY: Separate function for quality command handling
+--  Separate function for quality command handling
 function Scrappy.Config.HandleQualityCommand(qualityInput, toggle)
-    -- WHY: Validate inputs
+    --  Validate inputs
     if not qualityInput or not toggle then
         Scrappy.Print("Invalid quality command format.")
         return
     end
     
-    -- WHY: Accept both numeric and text quality input
+    --  Accept both numeric and text quality input
     local quality = tonumber(qualityInput)
     if not quality then
         quality = Scrappy.QUALITY_NAME_TO_ID[qualityInput:lower()]
     end
     
-    -- WHY: Validate quality range
+    --  Validate quality range
     if not quality or quality < 0 or quality > 4 then
         Scrappy.Print("Unknown quality: " .. qualityInput .. ". Use 0-4 or junk/common/uncommon/rare/epic")
         return
     end
     
-    -- WHY: Validate database structure
+    --  Validate database structure
     if not ScrappyDB.qualityFilter then
         ScrappyDB.qualityFilter = {}
     end
@@ -289,20 +289,20 @@ function Scrappy.Config.HandleQualityCommand(qualityInput, toggle)
     end
 end
 
--- WHY: Handle material filter commands
+--  Handle material filter commands
 function Scrappy.Config.HandleMaterialCommand(expansion, toggle)
-    -- WHY: Validate inputs
+    --  Validate inputs
     if not expansion or not toggle then
         Scrappy.Print("Invalid material command format.")
         return
     end
     
-    -- WHY: Validate database structure
+    --  Validate database structure
     if not ScrappyDB.materialFilters then
         ScrappyDB.materialFilters = {}
     end
     
-    -- WHY: Check if expansion exists in our filters
+    --  Check if expansion exists in our filters
     local validExpansions = {
         classic = "Classic (Vanilla)",
         tbc = "The Burning Crusade", 
@@ -337,14 +337,14 @@ function Scrappy.Config.HandleMaterialCommand(expansion, toggle)
     end
 end
 
--- WHY: Handle adding classification overrides for edge cases
+--  Handle adding classification overrides for edge cases
 function Scrappy.Config.HandleOverrideCommand(itemID, expansion, materialType)
     if not itemID or not expansion or not materialType then
         Scrappy.Print("Invalid override command format.")
         return
     end
     
-    -- WHY: Validate expansion
+    --  Validate expansion
     local validExpansions = {
         classic = true, tbc = true, wotlk = true, cata = true, mop = true,
         wod = true, legion = true, bfa = true, shadowlands = true, 
@@ -356,21 +356,21 @@ function Scrappy.Config.HandleOverrideCommand(itemID, expansion, materialType)
         return
     end
     
-    -- WHY: Store in saved variables for persistence
+    --  Store in saved variables for persistence
     ScrappyDB.materialOverrides = ScrappyDB.materialOverrides or {}
     ScrappyDB.materialOverrides[itemID] = {
         expansion = expansion:lower(),
         type = materialType:lower()
     }
     
-    -- WHY: Clear classification cache to apply immediately
+    --  Clear classification cache to apply immediately
     Scrappy.Filters.ClearClassificationCache()
     
     Scrappy.Print("Added override: ItemID " .. itemID .. " -> " .. expansion .. " " .. materialType)
     Scrappy.Print("This item will now be classified as " .. expansion .. " material.")
 end
 
--- WHY: Show current addon settings
+--  Show current addon settings
 function Scrappy.Config.ShowStatus()
     local ilvl = ScrappyDB.ilvlThreshold or 0
     
@@ -386,7 +386,7 @@ function Scrappy.Config.ShowStatus()
     else
         Scrappy.Print("  Item level threshold: " .. tostring(ilvl) .. " (manual)")
     end
-    -- WHY: Show selling order
+    --  Show selling order
     local orderText = "Default"
     if ScrappyDB.sellOrder == "value" then
         orderText = "Value (Low to High)"
@@ -395,7 +395,7 @@ function Scrappy.Config.ShowStatus()
     end
     Scrappy.Print("  Selling order: " .. orderText)
     
-    -- WHY: Show quality filter settings
+    --  Show quality filter settings
     for quality = 0, 4 do
         local qualityName = Scrappy.QUALITY_NAMES[quality] or ("Quality " .. quality)
         local enabled = ScrappyDB.qualityFilter and ScrappyDB.qualityFilter[quality]
@@ -403,7 +403,7 @@ function Scrappy.Config.ShowStatus()
         Scrappy.Print("  " .. qualityName .. ": " .. status)
     end
     
-    -- WHY: Show material filter settings
+    --  Show material filter settings
     if ScrappyDB.materialFilters then
         Scrappy.Print("  Material filters:")
         local expansionNames = {
@@ -428,7 +428,7 @@ function Scrappy.Config.ShowStatus()
     end
 end
 
--- WHY: Show cache statistics for debugging
+--  Show cache statistics for debugging
 function Scrappy.Config.ShowCacheStats()
     local cacheStats = Scrappy.Cache.GetCacheStats()
     local sellStatus = Scrappy.Recovery.GetSellStatus()
@@ -453,7 +453,7 @@ function Scrappy.Config.ShowCacheStats()
     Scrappy.Print("  Failed items: " .. sellStatus.failedItems)
 end
 
--- WHY: Scan bags for crafting materials and show what's found
+--  Scan bags for crafting materials and show what's found
 function Scrappy.Config.ScanMaterials()
     if not ScrappyDB then
         Scrappy.Print("Error: Settings not loaded yet.")
@@ -465,9 +465,9 @@ function Scrappy.Config.ScanMaterials()
     local materialsFound = {}
     local totalScanned = 0
     local errors = 0
-    local itemsSeen = {}  -- WHY: Track items we've already processed
+    local itemsSeen = {}  --  Track items we've already processed
     
-    -- WHY: Scan all bags for materials
+    --  Scan all bags for materials
     for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
         local success, numSlots = pcall(C_Container.GetContainerNumSlots, bag)
         if success and numSlots then
@@ -475,7 +475,7 @@ function Scrappy.Config.ScanMaterials()
                 totalScanned = totalScanned + 1
                 local itemInfo = Scrappy.Cache.GetItemInfoFromSlot(bag, slot)
                 if itemInfo then
-                    -- WHY: Only classify each unique item once
+                    --  Only classify each unique item once
                     if not itemsSeen[itemInfo.itemID] then
                         itemsSeen[itemInfo.itemID] = true
                         local materialInfo = Scrappy.Filters.GetMaterialInfo(itemInfo)
@@ -545,7 +545,7 @@ function Scrappy.Config.ScanMaterials()
         Scrappy.Print("Note: " .. errors .. " items couldn't be checked (not cached yet)")
     end
     
-    -- WHY: Show performance info
+    --  Show performance info
     local stats = Scrappy.Filters.GetClassificationStats()
     if stats.totalQueries > 0 then
         Scrappy.Print("Performance: " .. stats.totalQueries .. " queries, " .. 
@@ -553,7 +553,7 @@ function Scrappy.Config.ScanMaterials()
     end
 end
 
--- WHY: Quick scan - only show materials that are already cached
+--  Quick scan - only show materials that are already cached
 function Scrappy.Config.QuickScanMaterials()
     if not ScrappyDB then
         Scrappy.Print("Error: Settings not loaded yet.")
@@ -620,7 +620,7 @@ function Scrappy.Config.QuickScanMaterials()
     Scrappy.Print("(" .. successCount .. " items successfully scanned)")
 end
 
--- WHY: Test what would be sold without actually selling
+--  Test what would be sold without actually selling
 function Scrappy.Config.TestSelling()
     if not ScrappyDB then
         Scrappy.Print("Error: Settings not loaded yet.")
@@ -656,7 +656,7 @@ function Scrappy.Config.TestSelling()
     Scrappy.Print("Use '/scrappy sell' to actually sell these items.")
 end
 
--- WHY: Debug module loading
+--  Debug module loading
 function Scrappy.Config.DebugModules()
     Scrappy.Print("Module Status:")
     local modules = {"Core", "Config", "UI", "SettingsUI", "Filters", "Cache", "Recovery", "Gear"}
@@ -674,14 +674,14 @@ function Scrappy.Config.DebugModules()
     end
 end
 
--- WHY: Debug item class constants
+--  Debug item class constants
 function Scrappy.Config.DebugItemClasses()
     Scrappy.Print("Item Class Constants:")
     Scrappy.Print("  ITEM_CLASS_CONSUMABLE = " .. tostring(ITEM_CLASS_CONSUMABLE or "nil"))
     Scrappy.Print("  ITEM_CLASS_TRADE_GOODS = " .. tostring(ITEM_CLASS_TRADE_GOODS or "nil"))
     Scrappy.Print("  Expected values: Consumable=0, TradeGoods=7")
     
-    -- WHY: Test a few known consumables
+    --  Test a few known consumables
     local testItems = {
         [5512] = "Healthstone",  -- Known consumable
         [2447] = "Peacebloom",   -- Known herb
@@ -697,7 +697,7 @@ function Scrappy.Config.DebugItemClasses()
     end
 end
 
--- WHY: Test classification on a specific item
+--  Test classification on a specific item
 function Scrappy.Config.TestItemClassification(itemID)
     if not itemID then
         Scrappy.Print("Invalid item ID")
@@ -719,7 +719,7 @@ function Scrappy.Config.TestItemClassification(itemID)
     Scrappy.Print("  Class: " .. (class or "unknown"))
     Scrappy.Print("  Subclass: " .. (subclass or "unknown"))
     
-    -- WHY: Check if this item exists in bags and show actual vs cached ilvl
+    --  Check if this item exists in bags and show actual vs cached ilvl
     local foundInBags = false
     for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
         local success, numSlots = pcall(C_Container.GetContainerNumSlots, bag)
@@ -746,7 +746,7 @@ function Scrappy.Config.TestItemClassification(itemID)
         Scrappy.Print("  Item not found in bags")
     end
     
-    -- WHY: Test if it would be sold using bag data if available
+    --  Test if it would be sold using bag data if available
     local testItemInfo
     if foundInBags then
         testItemInfo = Scrappy.Cache.GetItemInfoFromSlot and 
@@ -780,7 +780,7 @@ function Scrappy.Config.TestItemClassification(itemID)
     end
 end
 
--- WHY: Show available commands
+--  Show available commands
 function Scrappy.Config.ShowHelp()
     Scrappy.Print("Commands:")
     Scrappy.Print("  /scrappy config              - Open settings UI")
@@ -815,6 +815,6 @@ function Scrappy.Config.ShowHelp()
     Scrappy.Print("  /scrappy materials legion protect - Protect Legion materials")
 end
 
--- WHY: Register slash commands
+--  Register slash commands
 SLASH_SCRAPPY1 = "/scrappy"
 SlashCmdList["SCRAPPY"] = Scrappy.Config.HandleSlashCommand

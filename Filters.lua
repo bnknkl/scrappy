@@ -1,18 +1,16 @@
--- Filters.lua - Smart item filtering with hybrid classification and Warbound protection
+-- Filters.lua - Item filtering and classification
 
--- WHY: Get reference to our addon namespace
 local Scrappy = _G["Scrappy"]
 
--- WHY: Item class constants from WoW's API
+-- Item class constants
 local ITEM_CLASS_CONSUMABLE = 0
 local ITEM_CLASS_TRADE_GOODS = 7
 local ITEM_CLASS_GEM = 3
 local ITEM_CLASS_REAGENT = 5
 
--- WHY: Small override table for items that don't classify correctly automatically
--- This replaces the massive 2000+ item table with just the edge cases
+-- Override table for edge cases that don't classify automatically  
 local MATERIAL_OVERRIDES = {
-    -- Special profession currencies that don't follow normal patterns
+    -- Special profession currencies
     [124124] = {expansion = "legion", type = "special"},        -- Blood of Sargeras
     [190454] = {expansion = "dragonflight", type = "special"},  -- Primal Chaos
     [191251] = {expansion = "dragonflight", type = "special"},  -- Primal Focus
@@ -24,7 +22,7 @@ local MATERIAL_OVERRIDES = {
     [211515] = {expansion = "tww", type = "special"},           -- Residual Memories
     [224069] = {expansion = "tww", type = "special"},           -- Concentrated Residual Memories
     
-    -- High-value items that might classify as wrong expansion due to level scaling
+    -- High-value enchanting materials
     [20725] = {expansion = "classic", type = "enchanting"},     -- Nexus Crystal
     [22450] = {expansion = "tbc", type = "enchanting"},         -- Void Crystal
     [34057] = {expansion = "wotlk", type = "enchanting"},       -- Abyss Crystal
@@ -34,7 +32,7 @@ local MATERIAL_OVERRIDES = {
     [124442] = {expansion = "legion", type = "enchanting"},     -- Chaos Crystal
     [152877] = {expansion = "bfa", type = "enchanting"},        -- Veiled Crystal
     
-    -- Rare herbs that might not classify correctly
+    -- Rare herbs
     [13468] = {expansion = "classic", type = "herb"},           -- Black Lotus
     [22793] = {expansion = "tbc", type = "herb"},               -- Mana Thistle
     [36908] = {expansion = "wotlk", type = "herb"},             -- Frost Lotus
@@ -53,7 +51,7 @@ local MATERIAL_OVERRIDES = {
     [190311] = {expansion = "dragonflight", type = "ore"},      -- Khaz'gorite Ore
 }
 
--- WHY: Pattern-based classification for material types
+-- Pattern matching for material types
 local MATERIAL_PATTERNS = {
     herb = {"leaf", "blossom", "flower", "petal", "bloom", "weed", "moss", "vine", "grass", "herb", "root", "lotus", "thistle"},
     ore = {"ore", "nugget", "bar", "ingot", "metal"},
@@ -63,7 +61,6 @@ local MATERIAL_PATTERNS = {
     cloth = {"cloth", "silk", "linen", "wool", "fabric", "thread", "weave"}
 }
 
--- WHY: Performance tracking
 local classificationStats = {
     totalQueries = 0,
     cacheHits = 0,
@@ -72,16 +69,15 @@ local classificationStats = {
     patternMatches = 0
 }
 
--- WHY: Cache for item classifications
 local classificationCache = {}
 
--- WHY: Smart expansion detection using multiple factors
+-- Determine expansion based on item level and ID ranges
 local function DetermineExpansion(itemInfo, ilvl, minLevel, name)
     ilvl = ilvl or 0
     minLevel = minLevel or 0
     local itemID = itemInfo.itemID
     
-    -- Strategy 1: Item level ranges (most accurate for gear)
+    -- Item level ranges (most accurate for gear)
     if minLevel >= 70 and ilvl >= 580 then return "tww" end
     if minLevel >= 70 and ilvl >= 550 then return "tww" end
     if minLevel >= 60 and ilvl >= 350 then return "dragonflight" end
@@ -95,7 +91,7 @@ local function DetermineExpansion(itemInfo, ilvl, minLevel, name)
     if minLevel >= 58 and ilvl >= 80 then return "tbc" end
     if ilvl > 0 and ilvl < 80 then return "classic" end
     
-    -- Strategy 2: Item ID ranges (fallback for crafting materials)
+    -- Item ID ranges (fallback)
     if itemID >= 210000 then return "tww" end
     if itemID >= 190000 then return "dragonflight" end
     if itemID >= 170000 then return "shadowlands" end
@@ -110,7 +106,6 @@ local function DetermineExpansion(itemInfo, ilvl, minLevel, name)
     return "classic"
 end
 
--- WHY: Determine material type from item name patterns
 local function GetMaterialTypeFromName(name)
     if not name then return "other" end
     
@@ -126,19 +121,16 @@ local function GetMaterialTypeFromName(name)
     return "other"
 end
 
--- WHY: Check if an item is Warbound until equipped
+-- Check if item is Warbound until equipped
 local function IsWarboundUntilEquipped(bag, slot)
     if not bag or not slot then return false end
     
-    -- WHY: Get the item link to examine its properties
     local itemLink = C_Container.GetContainerItemLink(bag, slot)
     if not itemLink then return false end
     
-    -- WHY: Check tooltip for Warbound text
     local tooltipData = C_TooltipInfo.GetBagItem(bag, slot)
     if not tooltipData or not tooltipData.lines then return false end
     
-    -- WHY: Look for "Warbound until equipped" text in tooltip
     for _, line in ipairs(tooltipData.lines) do
         if line.leftText then
             local text = line.leftText:lower()
@@ -151,11 +143,10 @@ local function IsWarboundUntilEquipped(bag, slot)
     return false
 end
 
--- WHY: Fallback method for Warbound detection using tooltip scanning
+-- Fallback warbound detection using tooltip scanning
 local function IsWarboundUntilEquippedFallback(bag, slot)
     if not bag or not slot then return false end
     
-    -- WHY: Create a hidden tooltip frame for scanning
     if not _G["ScrappyTooltipScanner"] then
         local scanner = CreateFrame("GameTooltip", "ScrappyTooltipScanner", nil, "GameTooltipTemplate")
         scanner:SetOwner(UIParent, "ANCHOR_NONE")
@@ -165,7 +156,6 @@ local function IsWarboundUntilEquippedFallback(bag, slot)
     scanner:ClearLines()
     scanner:SetBagItem(bag, slot)
     
-    -- WHY: Scan tooltip lines for Warbound text
     for i = 1, scanner:NumLines() do
         local line = _G["ScrappyTooltipScannerTextLeft" .. i]
         if line then
@@ -179,11 +169,11 @@ local function IsWarboundUntilEquippedFallback(bag, slot)
     return false
 end
 
--- WHY: Smart item classification using multiple strategies
+-- Item classification using multiple strategies
 local function ClassifyItem(itemInfo)
     if not itemInfo or not itemInfo.itemID then return nil end
     
-    -- Strategy 1: Check saved overrides first (only if database is loaded)
+    -- Check saved overrides first (only if database is loaded)
     if ScrappyDB and ScrappyDB.materialOverrides and ScrappyDB.materialOverrides[itemInfo.itemID] then
         local override = ScrappyDB.materialOverrides[itemInfo.itemID]
         classificationStats.overrideHits = classificationStats.overrideHits + 1
@@ -195,7 +185,7 @@ local function ClassifyItem(itemInfo)
         }
     end
     
-    -- Strategy 2: Check hardcoded overrides (built-in edge cases)
+    -- Check hardcoded overrides (built-in edge cases)
     local override = MATERIAL_OVERRIDES[itemInfo.itemID]
     if override then
         classificationStats.overrideHits = classificationStats.overrideHits + 1
@@ -207,7 +197,7 @@ local function ClassifyItem(itemInfo)
         }
     end
     
-    -- Strategy 3: Use WoW's item classification API
+    -- Use WoW's item classification API
     local name, link, quality, ilvl, minLevel, class, subclass = GetItemInfo(itemInfo.itemID)
     if not name then return nil end
     
@@ -218,13 +208,13 @@ local function ClassifyItem(itemInfo)
                               (class == ITEM_CLASS_GEM) or 
                               (class == ITEM_CLASS_REAGENT) or
                               (class == "Trade Goods") or
-                              (class == "Tradeskill") or  -- WHY: Some items return "Tradeskill" instead
+                              (class == "Tradeskill") or  -- Some items return "Tradeskill" instead
                               (class == "Gem") or
                               (class == "Reagent")
     
     if not isCraftingMaterial then return nil end
     
-    -- Strategy 4: Determine expansion and material type
+    -- Determine expansion and material type
     local expansion = DetermineExpansion(itemInfo, ilvl, minLevel, name)
     local materialType = GetMaterialTypeFromName(name)
     
@@ -236,7 +226,7 @@ local function ClassifyItem(itemInfo)
     }
 end
 
--- WHY: Main classification function with better caching and rate limiting
+-- Main classification function with caching
 local function GetItemClassification(itemInfo)
     if not itemInfo or not itemInfo.itemID then return nil end
     
@@ -252,10 +242,9 @@ local function GetItemClassification(itemInfo)
     -- Compute classification
     local classification = ClassifyItem(itemInfo)
     if classification then
-        -- WHY: Cache successful classifications
         classificationCache[itemInfo.itemID] = classification
     else
-        -- WHY: Cache negative results temporarily to avoid repeated failed lookups
+        -- Cache negative results temporarily to avoid repeated failed lookups
         classificationCache[itemInfo.itemID] = {
             isCraftingMaterial = false,
             failed = true,
@@ -266,13 +255,13 @@ local function GetItemClassification(itemInfo)
     return classification
 end
 
--- WHY: Clear old failed cache entries periodically
+-- Clear old failed cache entries periodically
 local function CleanupClassificationCache()
     local currentTime = GetTime()
     local cleaned = 0
     
     for itemID, classification in pairs(classificationCache) do
-        -- WHY: Remove failed entries older than 30 seconds
+        -- Remove failed entries older than 30 seconds
         if classification.failed and currentTime - (classification.timestamp or 0) > 30 then
             classificationCache[itemID] = nil
             cleaned = cleaned + 1
@@ -284,39 +273,36 @@ local function CleanupClassificationCache()
     end
 end
 
--- WHY: Periodic cache cleanup
+-- Periodic cache cleanup
 local cleanupTimer = C_Timer.NewTicker(30, CleanupClassificationCache)
 
--- WHY: This function extracts item information from a bag slot
 function Scrappy.Filters.GetItemInfoFromSlot(bag, slot)
-    -- WHY: Use the enhanced cache system for better reliability
     return Scrappy.Cache.GetItemInfoFromSlot(bag, slot)
 end
 
--- WHY: Updated core filtering function with STRICT consumable, profession, and Warbound protection
+-- Core filtering function with protections
 function Scrappy.Filters.IsItemSellable(itemInfo)
-    -- WHY: Basic validation
+    -- Basic validation
     if not itemInfo or not itemInfo.itemID then return false end
     if itemInfo.hasNoValue then return false end
-    if not ScrappyDB then return false end  -- Database not loaded yet
+    if not ScrappyDB then return false end
 
-    -- WHY: Get item classification first to check for consumables and profession gear
+    -- Get item classification first to check for consumables and profession gear
     local name, link, quality, ilvl, minLevel, class, subclass = GetItemInfo(itemInfo.itemID)
     if not name then 
-        -- WHY: Item not cached, can't determine if it's safe, so don't sell it
+        -- Item not cached, can't determine if it's safe, so don't sell it
         return false 
     end
 
-    -- WHY: Check for Warbound until equipped items (if protection is enabled)
+    -- Check for Warbound until equipped items (if protection is enabled)
     if ScrappyDB and ScrappyDB.protectWarbound and itemInfo.bag and itemInfo.slot then
         local isWarbound = false
         
-        -- WHY: Try modern API first, fallback to tooltip scanning
+        -- Try modern API first, fallback to tooltip scanning
         local success, result = pcall(IsWarboundUntilEquipped, itemInfo.bag, itemInfo.slot)
         if success then
             isWarbound = result
         else
-            -- WHY: Fallback to tooltip scanning
             local fallbackSuccess, fallbackResult = pcall(IsWarboundUntilEquippedFallback, itemInfo.bag, itemInfo.slot)
             if fallbackSuccess then
                 isWarbound = fallbackResult
@@ -329,11 +315,11 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
 
-    -- WHY: Check for gear tokens (if protection is enabled)
+    -- Check for gear tokens (if protection is enabled)
     if ScrappyDB and ScrappyDB.protectTokens and name then
         local lowerName = name:lower()
         
-        -- WHY: Comprehensive token detection patterns
+        -- Token detection patterns
         local tokenPatterns = {
             -- Classic tier token patterns
             "helm of the.*conqueror", "pauldrons of the.*conqueror", "breastplate of the.*conqueror",
@@ -361,7 +347,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             ".*upgrade.*token", ".*tier.*token", ".*gear.*token"
         }
         
-        -- WHY: Check for token patterns
+        -- Check for token patterns
         for _, pattern in ipairs(tokenPatterns) do
             if lowerName:find(pattern) then
                 Scrappy.QuietPrint("PROTECTED: " .. name .. " (gear token pattern: " .. pattern .. ")")
@@ -369,11 +355,11 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             end
         end
         
-        -- WHY: Additional checks for items that might be tokens but not match patterns
+        -- Additional checks for items that might be tokens but not match patterns
         -- Look for items with no item level but high quality (likely tokens)
         local ilvl = tonumber(itemInfo.ilvl) or 0
         if ilvl == 0 and quality >= 3 then -- Rare or Epic with no item level
-            -- WHY: Check if it's likely a token by looking for specific keywords
+            -- Check if it's likely a token by looking for specific keywords
             local suspiciousKeywords = {
                 "tier", "set", "armor", "weapon", "trophy", "mark", "emblem", 
                 "badge", "insignia", "seal", "fragment", "shard", "essence"
@@ -388,32 +374,38 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
     
-    -- WHY: ABSOLUTE PROTECTION - Check both numeric and string class values for consumables
+    -- Check both numeric and string class values for consumables
     if class == 0 or class == "Consumable" then
-        Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (consumable, class=" .. tostring(class) .. ")")
-        return false
+        -- Allow junk-quality consumables to be sold (they're vendor trash)
+        if quality == 0 then
+            Scrappy.QuietPrint("Allowing junk consumable: " .. (name or "Unknown Item"))
+            -- Continue with normal filtering
+        else
+            Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (consumable, class=" .. tostring(class) .. ")")
+            return false
+        end
     end
     
-    -- WHY: ABSOLUTE PROTECTION - Never sell profession equipment
+    -- Never sell profession equipment
     if class == 7 or class == "Trade Goods" then
-        -- WHY: Profession Tools subclass
+        -- Profession Tools subclass
         if subclass == 12 or subclass == "Device" or subclass == "Devices" then
             Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (profession tool)")
             return false
         end
         
-        -- WHY: Food & Drink protection
+        -- Food & Drink protection
         if subclass == 8 or subclass == "Food & Drink" then
             Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (food/drink)")
             return false
         end
     end
     
-    -- WHY: Enhanced name-based protection for profession equipment that might slip through
+    -- Enhanced name-based protection for profession equipment that might slip through
     if name then
         local lowerName = name:lower()
         
-        -- WHY: Consumable keywords - use word boundaries to avoid false matches
+        -- Consumable keywords - use word boundaries to avoid false matches
         local consumableKeywords = {
             "flask", "potion", "elixir", "food", "drink", "scroll", "bandage", 
             "healthstone", "conjured", "feast", "fish", "bread", "cheese",
@@ -421,9 +413,8 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             "cavedweller", "delight", "soup", "stew", "cake", "pie"
         }
         
-        -- WHY: Profession tool keywords - use word boundaries and more specific patterns
+        -- Profession tool keywords
         local professionKeywords = {
-            -- WHY: Use word boundaries (%f[%w]) to match whole words only
             "skinning knife", "mining pick", "herbalism", "blacksmith hammer", 
             "hammer", "tongs", "anvil", "forge", "crucible", "mortar", "pestle",
             "needle", "thread", "awl", "knife", "chisel", "file", "pliers",
@@ -438,7 +429,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             "inscription.*quill", "scribing.*tool", "vellum"
         }
         
-        -- WHY: Check for consumable keywords (simple contains check for these)
+        -- Check for consumable keywords
         for _, keyword in ipairs(consumableKeywords) do
             if lowerName:find(keyword) then
                 Scrappy.QuietPrint("PROTECTED: " .. name .. " (consumable keyword: " .. keyword .. ")")
@@ -446,7 +437,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             end
         end
         
-        -- WHY: Check for profession tool keywords (more specific matching)
+        -- Check for profession tool keywords
         for _, pattern in ipairs(professionKeywords) do
             if lowerName:find(pattern) then
                 Scrappy.QuietPrint("PROTECTED: " .. name .. " (profession tool pattern: " .. pattern .. ")")
@@ -454,7 +445,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             end
         end
         
-        -- WHY: Additional specific profession tool checks using word boundaries
+        -- Additional specific profession tool checks using word boundaries
         local specificChecks = {
             {pattern = "%f[%w]ink%f[%W]", description = "ink"}, -- Only match "ink" as whole word
             {pattern = "%f[%w]rod%f[%W]", description = "rod"}, -- Only match "rod" as whole word  
@@ -474,21 +465,21 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
 
-    -- WHY: Check quality filters first (this determines base sellability)
+    -- Check quality filters first (this determines base sellability)
     local quality = itemInfo.quality or 0
     local qualityAllowsSelling = ScrappyDB and ScrappyDB.qualityFilter and ScrappyDB.qualityFilter[quality]
     
-    -- WHY: If quality doesn't allow selling, don't sell regardless of item level
+    -- If quality doesn't allow selling, don't sell regardless of item level
     if not qualityAllowsSelling then
         return false
     end
 
-    -- WHY: Check explicit sell list (overrides everything else)
+    -- Check explicit sell list (overrides everything else)
     if ScrappyDB and ScrappyDB.sellList and ScrappyDB.sellList[itemInfo.itemID] then
         return true
     end
 
-    -- WHY: IMPORTANT: Check material protection BEFORE item level threshold
+    -- IMPORTANT: Check material protection BEFORE item level threshold
     -- Materials should be protected regardless of their item level
     if ScrappyDB and ScrappyDB.materialFilters then
         local classification = GetItemClassification(itemInfo)
@@ -500,11 +491,11 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
 
-    -- WHY: Check item level threshold (only if quality allows selling and materials aren't protected)
+    -- Check item level threshold (only if quality allows selling and materials aren't protected)
     local ilvlThreshold = (ScrappyDB and ScrappyDB.ilvlThreshold) or 0
     local ilvl = tonumber(itemInfo.ilvl) or 0
     
-    -- WHY: If threshold is set and item has level, use threshold logic
+    -- If threshold is set and item has level, use threshold logic
     if ilvlThreshold > 0 and ilvl > 0 then
         if ilvl <= ilvlThreshold then
             return true  -- Sell items at or below threshold
@@ -513,11 +504,11 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
 
-    -- WHY: Default behavior when no threshold is set - only sell based on quality
+    -- Default behavior when no threshold is set - only sell based on quality
     return true
 end
 
--- WHY: Helper function using smart classification
+-- Helper function using smart classification
 function Scrappy.Filters.IsExpansionMaterial(itemID)
     local itemInfo = {itemID = itemID}
     local classification = GetItemClassification(itemInfo)
@@ -527,7 +518,7 @@ function Scrappy.Filters.IsExpansionMaterial(itemID)
     return nil
 end
 
--- WHY: Get detailed material information
+-- Get detailed material information
 function Scrappy.Filters.GetMaterialInfo(itemInfo)
     local classification = GetItemClassification(itemInfo)
     if classification and classification.isCraftingMaterial then
@@ -541,7 +532,7 @@ function Scrappy.Filters.GetMaterialInfo(itemInfo)
     return nil
 end
 
--- WHY: Get classification performance statistics
+-- Get classification performance statistics
 function Scrappy.Filters.GetClassificationStats()
     local cacheSize = 0
     for _ in pairs(classificationCache) do
@@ -560,7 +551,7 @@ function Scrappy.Filters.GetClassificationStats()
     }
 end
 
--- WHY: Clear classification cache when needed
+-- Clear classification cache when needed
 function Scrappy.Filters.ClearClassificationCache()
     classificationCache = {}
     classificationStats = {
@@ -573,7 +564,7 @@ function Scrappy.Filters.ClearClassificationCache()
     Scrappy.Print("Classification cache cleared")
 end
 
--- WHY: Force cache items immediately for better performance
+-- Force cache items immediately for better performance
 function Scrappy.Filters.PreCacheItems()
     local cached = 0
     local failed = 0
@@ -586,7 +577,7 @@ function Scrappy.Filters.PreCacheItems()
             for slot = 1, numSlots do
                 local containerItem = C_Container.GetContainerItemInfo(bag, slot)
                 if containerItem and containerItem.itemID then
-                    -- WHY: Force WoW to cache the item
+                    -- Force WoW to cache the item
                     local name = GetItemInfo(containerItem.itemID)
                     if name then
                         cached = cached + 1
