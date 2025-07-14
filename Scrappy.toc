@@ -2,8 +2,8 @@
 ## Title: Scrappy
 ## Notes: Auto-sells junk and filtered items
 ## Version: 1.0
-## SavedVariables: ScrappyDB
 ## IconTexture: Interface\ICONS\INV_Misc_Coin_01
+## SavedVariables: ScrappyDB
 
 Core.lua
 Cache.lua

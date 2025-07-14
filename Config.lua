@@ -75,6 +75,32 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
 
+        -- WHY: Parse token protection commands
+        if msg == "tokens on" then
+            ScrappyDB.protectTokens = true
+            Scrappy.Print("Token protection enabled. Gear tokens and set pieces will not be sold.")
+            return
+        elseif msg == "tokens off" then
+            ScrappyDB.protectTokens = false
+            Scrappy.Print("Token protection disabled. Gear tokens and set pieces can be sold.")
+            return
+        end
+
+        -- WHY: Parse selling order commands
+        if msg == "order default" then
+            ScrappyDB.sellOrder = "default"
+            Scrappy.Print("Selling order set to: Default (bag order)")
+            return
+        elseif msg == "order value" then
+            ScrappyDB.sellOrder = "value"
+            Scrappy.Print("Selling order set to: Low to High Value (cheapest items first)")
+            return
+        elseif msg == "order quality" then
+            ScrappyDB.sellOrder = "quality"
+            Scrappy.Print("Selling order set to: Junk to Epic Quality (lowest quality first)")
+            return
+        end
+
         -- WHY: Parse item level threshold commands
         local ilvlMatch = msg:match("^ilvl%s+(%d+)$")
         if ilvlMatch then
@@ -352,6 +378,7 @@ function Scrappy.Config.ShowStatus()
     Scrappy.Print("  Auto-sell: " .. tostring(ScrappyDB.autoSell))
     Scrappy.Print("  Consumables: " .. (ScrappyDB.sellConsumables and "|cffff0000ENABLED|r (can sell flasks/potions)" or "|cff00ff00PROTECTED|r (safe)"))
     Scrappy.Print("  Warbound items: " .. (ScrappyDB.protectWarbound and "|cff00ff00PROTECTED|r" or "|cffff0000NOT PROTECTED|r"))
+    Scrappy.Print("  Gear tokens: " .. (ScrappyDB.protectTokens and "|cff00ff00PROTECTED|r" or "|cffff0000NOT PROTECTED|r"))
     if ScrappyDB.autoThreshold then
         local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
         Scrappy.Print("  Auto-threshold: ENABLED (avg ilvl: " .. string.format("%.1f", avgIlvl) .. ")")
@@ -359,6 +386,14 @@ function Scrappy.Config.ShowStatus()
     else
         Scrappy.Print("  Item level threshold: " .. tostring(ilvl) .. " (manual)")
     end
+    -- WHY: Show selling order
+    local orderText = "Default"
+    if ScrappyDB.sellOrder == "value" then
+        orderText = "Value (Low to High)"
+    elseif ScrappyDB.sellOrder == "quality" then
+        orderText = "Quality (Junk to Epic)"
+    end
+    Scrappy.Print("  Selling order: " .. orderText)
     
     -- WHY: Show quality filter settings
     for quality = 0, 4 do
@@ -754,10 +789,12 @@ function Scrappy.Config.ShowHelp()
     Scrappy.Print("  /scrappy warbound on|off      - Enable/disable Warbound until equipped protection")
     Scrappy.Print("  /scrappy ilvl [number]       - Set manual item level threshold")
     Scrappy.Print("  /scrappy autothreshold on|off [offset] - Auto-set threshold based on gear")
+    Scrappy.Print("  /scrappy tokens on|off        - Enable/disable gear token protection")
     Scrappy.Print("  /scrappy gear                - Show detailed gear analysis")
     Scrappy.Print("  /scrappy quality [#|name] [sell|keep] - Set quality sell rule")
     Scrappy.Print("  /scrappy materials [expansion] [protect|allow] - Set material protection")
     Scrappy.Print("  /scrappy override [itemid] [expansion] [type] - Add classification override")
+    Scrappy.Print("  /scrappy order default|value|quality - Set selling order for buyback safety")
     Scrappy.Print("  /scrappy scan                - Scan bags for crafting materials")
     Scrappy.Print("  /scrappy quickscan           - Quick scan (cached items only)")
     Scrappy.Print("  /scrappy precache            - Pre-cache items for better performance")

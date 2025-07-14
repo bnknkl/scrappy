@@ -109,10 +109,10 @@ function Scrappy.Gear.EnableAutoThreshold(offset)
     Scrappy.Gear.UpdateAutoThreshold()
     
     local avgIlvl, _, itemCount = Scrappy.Gear.GetEquippedAverageItemLevel()
-    Scrappy.Print("Auto-threshold enabled!")
-    Scrappy.Print("Your average equipped ilvl: " .. string.format("%.1f", avgIlvl) .. " (" .. itemCount .. " items)")
-    Scrappy.Print("Threshold offset: " .. (ScrappyDB.autoThresholdOffset or -10))
-    Scrappy.Print("Current sell threshold: " .. (ScrappyDB.ilvlThreshold or 0))
+    Scrappy.QuietPrint("Auto-threshold enabled!")
+    Scrappy.QuietPrint("Your average equipped ilvl: " .. string.format("%.1f", avgIlvl) .. " (" .. itemCount .. " items)")
+    Scrappy.QuietPrint("Threshold offset: " .. (ScrappyDB.autoThresholdOffset or -10))
+    Scrappy.QuietPrint("Current sell threshold: " .. (ScrappyDB.ilvlThreshold or 0))
 end
 
 -- WHY: Disable auto-threshold system
@@ -120,7 +120,7 @@ function Scrappy.Gear.DisableAutoThreshold()
     if not ScrappyDB then return end
     
     ScrappyDB.autoThreshold = false
-    Scrappy.Print("Auto-threshold disabled. Manual ilvl threshold: " .. (ScrappyDB.ilvlThreshold or 0))
+    Scrappy.QuietPrint("Auto-threshold disabled. Manual ilvl threshold: " .. (ScrappyDB.ilvlThreshold or 0))
 end
 
 -- WHY: Show detailed gear analysis

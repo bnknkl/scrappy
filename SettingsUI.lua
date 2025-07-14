@@ -82,7 +82,8 @@ local function CreateTabButtons(parent)
     local tabs = {}
     local tabWidth = 120
     local tabHeight = 32
-    local startX = 50
+    local totalWidth = (#TABS * tabWidth) + ((#TABS - 1) * 5)  -- Total width including spacing
+    local startX = (700 - totalWidth) / 2  -- Center the tabs in the 700px wide frame
     
     for i, tabInfo in ipairs(TABS) do
         local tab = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -228,6 +229,30 @@ local function CreateButton(parent, text, tooltip, point, relativeFrame, relativ
     return button
 end
 
+local function CreateDropdown(parent, name, tooltip, point, relativeFrame, relativePoint, x, y)
+    local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
+    dropdown:SetPoint(point, relativeFrame, relativePoint, x, y)
+    
+    -- WHY: Title
+    dropdown.title = dropdown:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    dropdown.title:SetPoint("BOTTOMLEFT", dropdown, "TOPLEFT", 16, 3)
+    dropdown.title:SetText(name)
+    
+    if tooltip then
+        dropdown.tooltipText = tooltip
+        dropdown:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(self.tooltipText)
+            GameTooltip:Show()
+        end)
+        dropdown:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    end
+    
+    return dropdown
+end
+
 -- WHY: Create General tab content
 local function CreateGeneralTab(parent)
     local container = CreateFrame("Frame", nil, parent)
@@ -274,25 +299,6 @@ local function CreateGeneralTab(parent)
         "Automatically set sell threshold based on your equipped gear", 
         "TOPLEFT", thresholdTitle, "BOTTOMLEFT", 0, -10)
     
-    autoThresholdCheck:SetScript("OnClick", function(self)
-        if self:GetChecked() then
-            if Scrappy.Gear and Scrappy.Gear.EnableAutoThreshold then
-                Scrappy.Gear.EnableAutoThreshold()
-            else
-                ScrappyDB.autoThreshold = true
-                Scrappy.QuietPrint("Auto-threshold enabled (gear module not loaded)")
-            end
-        else
-            if Scrappy.Gear and Scrappy.Gear.DisableAutoThreshold then
-                Scrappy.Gear.DisableAutoThreshold()
-            else
-                ScrappyDB.autoThreshold = false
-                Scrappy.QuietPrint("Auto-threshold disabled")
-            end
-        end
-        Scrappy.SettingsUI.RefreshUI()
-    end)
-    
     -- WHY: Manual ilvl threshold slider
     local ilvlSlider = CreateSlider(container, "Manual Item Level Threshold", 
         "Sell items with item level at or below this value (0 = disabled)", 
@@ -306,10 +312,36 @@ local function CreateGeneralTab(parent)
         end
     end)
     
+    -- WHY: Set up auto-threshold checkbox script after slider is created
+    autoThresholdCheck:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            if Scrappy.Gear and Scrappy.Gear.EnableAutoThreshold then
+                Scrappy.Gear.EnableAutoThreshold()
+            else
+                ScrappyDB.autoThreshold = true
+                Scrappy.QuietPrint("Auto-threshold enabled (gear module not loaded)")
+            end
+            
+            -- WHY: Update slider to show current equipped average when auto-threshold is enabled
+            if Scrappy.Gear and Scrappy.Gear.GetEquippedAverageItemLevel then
+                local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
+                ilvlSlider:SetValue(math.floor(avgIlvl))
+            end
+        else
+            if Scrappy.Gear and Scrappy.Gear.DisableAutoThreshold then
+                Scrappy.Gear.DisableAutoThreshold()
+            else
+                ScrappyDB.autoThreshold = false
+                Scrappy.QuietPrint("Auto-threshold disabled")
+            end
+        end
+        Scrappy.SettingsUI.RefreshUI()
+    end)
+    
     -- WHY: Auto-threshold offset slider
     local offsetSlider = CreateSlider(container, "Auto-Threshold Offset", 
         "How many item levels below your average equipped ilvl to set the threshold", 
-        -50, 0, "TOPLEFT", ilvlSlider, "BOTTOMLEFT", 0, -70)
+        -50, 0, "TOPLEFT", ilvlSlider, "BOTTOMLEFT", 0, -25)
     
     offsetSlider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value)
@@ -320,36 +352,60 @@ local function CreateGeneralTab(parent)
         end
     end)
     
+    -- WHY: Selling order section
+    local orderTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    orderTitle:SetPoint("TOPLEFT", autoSellCheck, "TOPRIGHT", 100, -5)
+    orderTitle:SetTextColor(1, 0.82, 0)
+    
+    -- WHY: Selling order dropdown
+    local orderDropdown = CreateDropdown(container, "Selling Order", 
+        "Order in which items are sold - affects buyback window in case of oopsies.",
+        "TOPLEFT", orderTitle, "TOPRIGHT", 100, -10)
+    
+    -- WHY: Initialize dropdown
+    UIDropDownMenu_SetWidth(orderDropdown, 200)
+    UIDropDownMenu_SetText(orderDropdown, "Bag Order (default)")
+    
+    UIDropDownMenu_Initialize(orderDropdown, function(self, level)
+        local info = UIDropDownMenu_CreateInfo()
+        
+        -- Default order option
+        info.text = "Default Order"
+        info.value = "default"
+        info.func = function()
+            ScrappyDB.sellOrder = "default"
+            UIDropDownMenu_SetText(orderDropdown, "Bag Order (default)")
+            Scrappy.QuietPrint("Selling order: Default (bag order)")
+        end
+        info.checked = (ScrappyDB.sellOrder == "default" or not ScrappyDB.sellOrder)
+        UIDropDownMenu_AddButton(info)
+        
+        -- Value order option
+        info.text = "Low to High Value"
+        info.value = "value"
+        info.func = function()
+            ScrappyDB.sellOrder = "value"
+            UIDropDownMenu_SetText(orderDropdown, "Low to High Value")
+            Scrappy.QuietPrint("Selling order: Low to High Value (cheapest items first)")
+        end
+        info.checked = (ScrappyDB.sellOrder == "value")
+        UIDropDownMenu_AddButton(info)
+        
+        -- Quality order option
+        info.text = "Junk to Epic Quality"
+        info.value = "quality"
+        info.func = function()
+            ScrappyDB.sellOrder = "quality"
+            UIDropDownMenu_SetText(orderDropdown, "Junk to Epic Quality")
+            Scrappy.QuietPrint("Selling order: Junk to Epic Quality (lowest quality first)")
+        end
+        info.checked = (ScrappyDB.sellOrder == "quality")
+        UIDropDownMenu_AddButton(info)
+    end)
+    
     -- WHY: Action buttons
-    local buttonY = -350
-    local testButton = CreateButton(container, "Test Selling", 
-        "Preview what items would be sold without actually selling them",
-        "TOPLEFT", container, "TOPLEFT", 20, buttonY, 120, 25)
-    testButton:SetScript("OnClick", function()
-        if Scrappy.Config and Scrappy.Config.TestSelling then
-            Scrappy.Config.TestSelling()
-        else
-            Scrappy.Print("Test function not available")
-        end
-    end)
-    
-    local gearButton = CreateButton(container, "Analyze Gear", 
-        "Show detailed analysis of your equipped gear and thresholds",
-        "LEFT", testButton, "RIGHT", 10, 0, 120, 25)
-    gearButton:SetScript("OnClick", function()
-        if Scrappy.Gear and Scrappy.Gear.ShowGearAnalysis then
-            Scrappy.Gear.ShowGearAnalysis()
-        else
-            Scrappy.Print("Gear analysis not available")
-        end
-    end)
-    
-    local resetButton = CreateButton(container, "Reset to Defaults", 
-        "Reset all settings to safe default values",
-        "LEFT", gearButton, "RIGHT", 10, 0, 140, 25)
-    resetButton:SetScript("OnClick", function()
-        Scrappy.SettingsUI.ResetToDefaults()
-    end)
+    local buttonY = -350  -- Restored to original position since selling order moved to right column
+    -- Buttons moved to main frame - see CreateUI function
     
     -- WHY: Store references for refreshing
     container.autoSellCheck = autoSellCheck
@@ -358,6 +414,7 @@ local function CreateGeneralTab(parent)
     container.autoThresholdCheck = autoThresholdCheck
     container.ilvlSlider = ilvlSlider
     container.offsetSlider = offsetSlider
+    container.orderDropdown = orderDropdown
     
     return container
 end
@@ -394,9 +451,7 @@ local function CreateFiltersTab(parent)
         
         check:SetScript("OnClick", function(self)
             if not ScrappyDB.qualityFilter then
-                ScrappyDB.protectWarbound = false  -- Default: don't protect Warbound items
-    
-    ScrappyDB.qualityFilter = {}
+                ScrappyDB.qualityFilter = {}
             end
             ScrappyDB.qualityFilter[quality] = self:GetChecked()
             Scrappy.QuietPrint("Quality " .. qualityName .. ": " .. (self:GetChecked() and "sell" or "keep"))
@@ -405,23 +460,6 @@ local function CreateFiltersTab(parent)
         qualityChecks[quality] = check
         yOffset = yOffset - 30
     end
-    
-    -- WHY: Future filter sections can be added here
-    local futureTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    futureTitle:SetPoint("TOPLEFT", container, "TOPLEFT", 350, -20)
-    futureTitle:SetText("Advanced Filters")
-    futureTitle:SetTextColor(1, 0.82, 0)
-    
-    local futureDesc = container:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    futureDesc:SetPoint("TOPLEFT", futureTitle, "BOTTOMLEFT", 0, -5)
-    futureDesc:SetText("Additional filter options (coming soon):")
-    futureDesc:SetTextColor(0.8, 0.8, 0.8)
-    
-    -- WHY: Placeholder for future filters
-    local placeholderText = container:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    placeholderText:SetPoint("TOPLEFT", futureDesc, "BOTTOMLEFT", 0, -20)
-    placeholderText:SetText("• Vendor Value Filters\n• Item Age Filters\n• Custom Name Patterns\n• Bind-on-Equip Filters")
-    placeholderText:SetTextColor(0.6, 0.6, 0.6)
     
     -- WHY: Action buttons
     local scanButton = CreateButton(container, "Scan Materials", 
@@ -480,19 +518,40 @@ local function CreateProtectionsTab(parent)
     professionCheck:SetChecked(true)
     professionCheck:Disable()
     
+    -- WHY: Optional protections section
+    local optionalTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    optionalTitle:SetPoint("TOPLEFT", professionCheck, "BOTTOMLEFT", 0, -30)
+    optionalTitle:SetText("Optional Protections")
+    optionalTitle:SetTextColor(1, 0.82, 0)
+    
+    local optionalDesc = container:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    optionalDesc:SetPoint("TOPLEFT", optionalTitle, "BOTTOMLEFT", 0, -5)
+    optionalDesc:SetText("These protections can be toggled on or off:")
+    optionalDesc:SetTextColor(0.8, 0.8, 0.8)
+    
     -- WHY: Warbound until equipped protection (toggleable)
     local warboundCheck = CreateCheckbox(container, "Protect Warbound until Equipped Items", 
         "Prevents selling items marked 'Warbound until equipped' - valuable for gearing alts.", 
-        "TOPLEFT", professionCheck, "BOTTOMLEFT", 0, -10)
+        "TOPLEFT", optionalDesc, "BOTTOMLEFT", 0, -15)
     
     warboundCheck:SetScript("OnClick", function(self)
         ScrappyDB.protectWarbound = self:GetChecked()
         Scrappy.QuietPrint("Warbound protection " .. (ScrappyDB.protectWarbound and "enabled" or "disabled"))
     end)
     
+    -- WHY: Token protection (toggleable)
+    local tokenCheck = CreateCheckbox(container, "Protect Gear Tokens and Set Pieces", 
+        "Prevents selling tier tokens, set piece tokens, and other gear upgrade items.", 
+        "TOPLEFT", warboundCheck, "BOTTOMLEFT", 0, -10)
+    
+    tokenCheck:SetScript("OnClick", function(self)
+        ScrappyDB.protectTokens = self:GetChecked()
+        Scrappy.QuietPrint("Token protection " .. (ScrappyDB.protectTokens and "enabled" or "disabled"))
+    end)
+    
     -- WHY: Material protections section
     local materialTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    materialTitle:SetPoint("TOPLEFT", warboundCheck, "BOTTOMLEFT", 0, -30)
+    materialTitle:SetPoint("TOPLEFT", tokenCheck, "BOTTOMLEFT", 0, -30)
     materialTitle:SetText("Crafting Material Protection")
     materialTitle:SetTextColor(1, 0.82, 0)
     
@@ -562,24 +621,9 @@ local function CreateProtectionsTab(parent)
         currentY = currentY - 25
     end
     
-    -- WHY: Future protections section
-    local futureTitle = container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    futureTitle:SetPoint("TOPLEFT", container, "TOPLEFT", 20, -420)
-    futureTitle:SetText("Additional Protections")
-    futureTitle:SetTextColor(1, 0.82, 0)
-    
-    local futureDesc = container:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    futureDesc:SetPoint("TOPLEFT", futureTitle, "BOTTOMLEFT", 0, -5)
-    futureDesc:SetText("Future protection options (coming soon):")
-    futureDesc:SetTextColor(0.8, 0.8, 0.8)
-    
-    local futurePlaceholder = container:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    futurePlaceholder:SetPoint("TOPLEFT", futureDesc, "BOTTOMLEFT", 0, -15)
-    futurePlaceholder:SetText("• Custom Item Whitelist\n• Transmog Appearance Protection\n• Recently Acquired Item Protection\n• High-Value Item Warnings")
-    futurePlaceholder:SetTextColor(0.6, 0.6, 0.6)
-    
     container.materialChecks = materialChecks
     container.warboundCheck = warboundCheck
+    container.tokenCheck = tokenCheck
     return container
 end
 
@@ -634,6 +678,41 @@ function Scrappy.SettingsUI.CreateUI()
     frame.filtersTab = CreateFiltersTab(frame.content)
     frame.protectionsTab = CreateProtectionsTab(frame.content)
     
+    -- WHY: Create action buttons outside of tabs (always visible and centered)
+    local buttonWidths = {120, 120, 140}  -- Test Selling, Analyze Gear, Reset to Defaults
+    local buttonSpacing = 10
+    local totalButtonWidth = buttonWidths[1] + buttonWidths[2] + buttonWidths[3] + (buttonSpacing * 2)
+    local startButtonX = (700 - totalButtonWidth) / 2  -- Center the buttons in the 700px wide frame
+    
+    local testButton = CreateButton(frame, "Test Selling", 
+        "Preview what items would be sold without actually selling them",
+        "BOTTOMLEFT", frame, "BOTTOMLEFT", startButtonX, 30, buttonWidths[1], 25)
+    testButton:SetScript("OnClick", function()
+        if Scrappy.Config and Scrappy.Config.TestSelling then
+            Scrappy.Config.TestSelling()
+        else
+            Scrappy.Print("Test function not available")
+        end
+    end)
+    
+    local gearButton = CreateButton(frame, "Analyze Gear", 
+        "Show detailed analysis of your equipped gear and thresholds",
+        "LEFT", testButton, "RIGHT", buttonSpacing, 0, buttonWidths[2], 25)
+    gearButton:SetScript("OnClick", function()
+        if Scrappy.Gear and Scrappy.Gear.ShowGearAnalysis then
+            Scrappy.Gear.ShowGearAnalysis()
+        else
+            Scrappy.Print("Gear analysis not available")
+        end
+    end)
+    
+    local resetButton = CreateButton(frame, "Reset to Defaults", 
+        "Reset all settings to safe default values",
+        "LEFT", gearButton, "RIGHT", buttonSpacing, 0, buttonWidths[3], 25)
+    resetButton:SetScript("OnClick", function()
+        Scrappy.SettingsUI.ResetToDefaults()
+    end)
+    
     -- WHY: Initially hide all tabs except general
     frame.filtersTab:Hide()
     frame.protectionsTab:Hide()
@@ -657,7 +736,19 @@ function Scrappy.SettingsUI.RefreshUI()
         frame.generalTab.autoThresholdCheck:SetChecked(ScrappyDB.autoThreshold or false)
         
         -- WHY: Update sliders
-        frame.generalTab.ilvlSlider:SetValue(ScrappyDB.ilvlThreshold or 0)
+        if ScrappyDB.autoThreshold then
+            -- WHY: When auto-threshold is on, show the current equipped average
+            if Scrappy.Gear and Scrappy.Gear.GetEquippedAverageItemLevel then
+                local avgIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
+                frame.generalTab.ilvlSlider:SetValue(math.floor(avgIlvl))
+            else
+                frame.generalTab.ilvlSlider:SetValue(ScrappyDB.ilvlThreshold or 0)
+            end
+        else
+            -- WHY: When auto-threshold is off, show the manual setting
+            frame.generalTab.ilvlSlider:SetValue(ScrappyDB.ilvlThreshold or 0)
+        end
+        
         frame.generalTab.ilvlSlider:SetEnabled(not ScrappyDB.autoThreshold)
         frame.generalTab.ilvlSlider.title:SetTextColor(ScrappyDB.autoThreshold and 0.5 or 1, 
                                            ScrappyDB.autoThreshold and 0.5 or 1, 
@@ -668,6 +759,17 @@ function Scrappy.SettingsUI.RefreshUI()
         frame.generalTab.offsetSlider.title:SetTextColor(ScrappyDB.autoThreshold and 1 or 0.5, 
                                              ScrappyDB.autoThreshold and 1 or 0.5, 
                                              ScrappyDB.autoThreshold and 1 or 0.5)
+        
+        -- WHY: Update selling order dropdown
+        if frame.generalTab.orderDropdown then
+            local orderText = "Default Order"
+            if ScrappyDB.sellOrder == "value" then
+                orderText = "Low to High Value"
+            elseif ScrappyDB.sellOrder == "quality" then
+                orderText = "Junk to Epic Quality"
+            end
+            UIDropDownMenu_SetText(frame.generalTab.orderDropdown, orderText)
+        end
     end
     
     -- WHY: Refresh Filters tab
@@ -681,16 +783,21 @@ function Scrappy.SettingsUI.RefreshUI()
     end
     
     -- WHY: Refresh Protections tab
-    if frame.protectionsTab and frame.protectionsTab.materialChecks then
-        -- WHY: Update Warbound protection checkbox
+    if frame.protectionsTab then
+        -- WHY: Update Warbound and Token protection checkboxes
         if frame.protectionsTab.warboundCheck then
             frame.protectionsTab.warboundCheck:SetChecked(ScrappyDB.protectWarbound or false)
         end
+        if frame.protectionsTab.tokenCheck then
+            frame.protectionsTab.tokenCheck:SetChecked(ScrappyDB.protectTokens or false)
+        end
         
         -- WHY: Update material protection checkboxes
-        for expansion, check in pairs(frame.protectionsTab.materialChecks) do
-            local enabled = ScrappyDB.materialFilters and ScrappyDB.materialFilters[expansion]
-            check:SetChecked(enabled or false)
+        if frame.protectionsTab.materialChecks then
+            for expansion, check in pairs(frame.protectionsTab.materialChecks) do
+                local enabled = ScrappyDB.materialFilters and ScrappyDB.materialFilters[expansion]
+                check:SetChecked(enabled or false)
+            end
         end
     end
 end
@@ -704,6 +811,9 @@ function Scrappy.SettingsUI.ResetToDefaults()
     ScrappyDB.ilvlThreshold = 0
     ScrappyDB.autoThresholdOffset = -10
     ScrappyDB.sellConsumables = false
+    ScrappyDB.protectWarbound = false  -- Default: don't protect Warbound items
+    ScrappyDB.protectTokens = true     -- Default: protect gear tokens (they're valuable)
+    ScrappyDB.sellOrder = "default"    -- Default: sell in bag order
     
     ScrappyDB.qualityFilter = {
         [0] = true,  -- Junk

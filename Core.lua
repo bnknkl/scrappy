@@ -92,6 +92,9 @@ function Scrappy.Core.SellItems()
     end
     
     if #items > 0 then
+        -- WHY: Sort items according to user preference
+        Scrappy.Core.SortItemsForSelling(items)
+        
         -- WHY: Use the recovery system for selling
         Scrappy.Recovery.StartSelling(items)
         if errorCount > 0 then
@@ -104,6 +107,53 @@ function Scrappy.Core.SellItems()
             Scrappy.Print("No items to sell.")
         end
     end
+end
+
+-- WHY: Sort items according to user preference to control selling order
+function Scrappy.Core.SortItemsForSelling(items)
+    if not ScrappyDB or not ScrappyDB.sellOrder or ScrappyDB.sellOrder == "default" then
+        return -- Keep default bag order
+    end
+    
+    if ScrappyDB.sellOrder == "value" then
+        -- WHY: Sort by vendor value (low to high) - cheapest items sell first
+        table.sort(items, function(a, b)
+            local valueA = Scrappy.Core.GetItemVendorValue(a) or 0
+            local valueB = Scrappy.Core.GetItemVendorValue(b) or 0
+            return valueA < valueB
+        end)
+        Scrappy.QuietPrint("Selling " .. #items .. " items in value order (cheapest first)")
+        
+    elseif ScrappyDB.sellOrder == "quality" then
+        -- WHY: Sort by quality (junk to epic) - lowest quality sells first
+        table.sort(items, function(a, b)
+            local qualityA = a.quality or 0
+            local qualityB = b.quality or 0
+            if qualityA == qualityB then
+                -- WHY: Secondary sort by item level if same quality
+                local ilvlA = tonumber(a.ilvl) or 0
+                local ilvlB = tonumber(b.ilvl) or 0
+                return ilvlA < ilvlB
+            end
+            return qualityA < qualityB
+        end)
+        Scrappy.QuietPrint("Selling " .. #items .. " items in quality order (junk first)")
+    end
+end
+
+-- WHY: Get vendor value for an item (for sorting purposes)
+function Scrappy.Core.GetItemVendorValue(itemInfo)
+    if not itemInfo or not itemInfo.itemID then return 0 end
+    
+    -- WHY: Try to get vendor price from WoW's API
+    local _, _, _, _, _, _, _, _, _, _, vendorPrice = GetItemInfo(itemInfo.itemID)
+    if vendorPrice and vendorPrice > 0 then
+        -- WHY: Multiply by stack count if it's a stack
+        local stackCount = itemInfo.stackCount or 1
+        return vendorPrice * stackCount
+    end
+    
+    return 0
 end
 
 -- WHY: Recursive function with timer prevents hitting the server too fast
@@ -162,6 +212,9 @@ function Scrappy.Core.GetItemsToSell()
         end
     end
     
+    -- WHY: Sort items according to user preference for preview
+    Scrappy.Core.SortItemsForSelling(items)
+    
     -- WHY: Add metadata about cache status
     items._cacheInfo = {
         pendingItems = pendingCount,
@@ -189,6 +242,8 @@ local function OnAddonLoaded(addonName)
     ScrappyDB.ilvlThreshold = ScrappyDB.ilvlThreshold or 0
     ScrappyDB.protectWarbound = ScrappyDB.protectWarbound or true
     ScrappyDB.sellList = ScrappyDB.sellList or {}
+    ScrappyDB.protectTokens = ScrappyDB.protectTokens ~= false  -- Default: true (protect tokens)
+    ScrappyDB.sellOrder = ScrappyDB.sellOrder or "default"  -- Default: sell in bag order
     ScrappyDB.materialFilters = ScrappyDB.materialFilters or {
         classic = false,
         tbc = false,
