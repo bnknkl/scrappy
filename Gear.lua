@@ -1,10 +1,10 @@
 -- Gear.lua - Gear analysis and auto-threshold system
 
--- WHY: Get reference to our addon namespace
+--  Get reference to our addon namespace
 local Scrappy = _G["Scrappy"]
 Scrappy.Gear = {}
 
--- WHY: Equipment slot constants
+--  Equipment slot constants
 local EQUIPMENT_SLOTS = {
     [1] = "HeadSlot",           -- Head
     [2] = "NeckSlot",           -- Neck  
@@ -25,23 +25,23 @@ local EQUIPMENT_SLOTS = {
     [18] = "RangedSlot",        -- Ranged
 }
 
--- WHY: Get item level for equipped item in specific slot
+--  Get item level for equipped item in specific slot
 local function GetEquippedItemLevel(slotId)
     local itemLink = GetInventoryItemLink("player", slotId)
     if not itemLink then return nil end
     
-    -- WHY: Extract item level from tooltip (most reliable method)
+    --  Extract item level from tooltip (most reliable method)
     local itemLevel = GetDetailedItemLevelInfo(itemLink)
     if itemLevel and itemLevel > 0 then
         return itemLevel
     end
     
-    -- WHY: Fallback to GetItemInfo if detailed info fails
+    --  Fallback to GetItemInfo if detailed info fails
     local _, _, _, ilvl = GetItemInfo(itemLink)
     return ilvl
 end
 
--- WHY: Calculate average item level of equipped gear
+--  Calculate average item level of equipped gear
 function Scrappy.Gear.GetEquippedAverageItemLevel()
     local totalItemLevel = 0
     local itemCount = 0
@@ -53,7 +53,7 @@ function Scrappy.Gear.GetEquippedAverageItemLevel()
             totalItemLevel = totalItemLevel + ilvl
             itemCount = itemCount + 1
             
-            -- WHY: Store breakdown for debugging
+            --  Store breakdown for debugging
             table.insert(gearBreakdown, {
                 slot = slotName,
                 ilvl = ilvl
@@ -66,21 +66,21 @@ function Scrappy.Gear.GetEquippedAverageItemLevel()
     return averageIlvl, gearBreakdown, itemCount
 end
 
--- WHY: Calculate what the auto-threshold should be
+--  Calculate what the auto-threshold should be
 function Scrappy.Gear.CalculateAutoThreshold()
     if not ScrappyDB then return 0 end
     
     local averageIlvl = Scrappy.Gear.GetEquippedAverageItemLevel()
     local offset = ScrappyDB.autoThresholdOffset or -10
     
-    -- WHY: Don't go below 0, and round to nearest 5 for cleaner numbers
+    --  Don't go below 0, and round to nearest 5 for cleaner numbers
     local threshold = math.max(0, averageIlvl + offset)
     threshold = math.floor(threshold / 5) * 5  -- Round to nearest 5
     
     return threshold
 end
 
--- WHY: Update the item level threshold based on equipped gear
+--  Update the item level threshold based on equipped gear
 function Scrappy.Gear.UpdateAutoThreshold()
     if not ScrappyDB or not ScrappyDB.autoThreshold then return end
     
@@ -96,7 +96,7 @@ function Scrappy.Gear.UpdateAutoThreshold()
     return false
 end
 
--- WHY: Enable auto-threshold system
+--  Enable auto-threshold system
 function Scrappy.Gear.EnableAutoThreshold(offset)
     if not ScrappyDB then return end
     
@@ -105,7 +105,7 @@ function Scrappy.Gear.EnableAutoThreshold(offset)
         ScrappyDB.autoThresholdOffset = offset
     end
     
-    -- WHY: Immediately update threshold
+    --  Immediately update threshold
     Scrappy.Gear.UpdateAutoThreshold()
     
     local avgIlvl, _, itemCount = Scrappy.Gear.GetEquippedAverageItemLevel()
@@ -115,7 +115,7 @@ function Scrappy.Gear.EnableAutoThreshold(offset)
     Scrappy.QuietPrint("Current sell threshold: " .. (ScrappyDB.ilvlThreshold or 0))
 end
 
--- WHY: Disable auto-threshold system
+--  Disable auto-threshold system
 function Scrappy.Gear.DisableAutoThreshold()
     if not ScrappyDB then return end
     
@@ -123,7 +123,7 @@ function Scrappy.Gear.DisableAutoThreshold()
     Scrappy.QuietPrint("Auto-threshold disabled. Manual ilvl threshold: " .. (ScrappyDB.ilvlThreshold or 0))
 end
 
--- WHY: Show detailed gear analysis
+--  Show detailed gear analysis
 function Scrappy.Gear.ShowGearAnalysis()
     local avgIlvl, gearBreakdown, itemCount = Scrappy.Gear.GetEquippedAverageItemLevel()
     
@@ -145,7 +145,7 @@ function Scrappy.Gear.ShowGearAnalysis()
         Scrappy.Print("  Status: Manual mode")
     end
     
-    -- WHY: Show lowest and highest ilvl items for context
+    --  Show lowest and highest ilvl items for context
     table.sort(gearBreakdown, function(a, b) return a.ilvl < b.ilvl end)
     
     local lowest = gearBreakdown[1]
@@ -154,7 +154,7 @@ function Scrappy.Gear.ShowGearAnalysis()
     Scrappy.Print("  Lowest: " .. lowest.slot .. " (" .. lowest.ilvl .. ")")
     Scrappy.Print("  Highest: " .. highest.slot .. " (" .. highest.ilvl .. ")")
     
-    -- WHY: Suggest threshold if not using auto
+    --  Suggest threshold if not using auto
     if not ScrappyDB.autoThreshold then
         local suggestedThreshold = math.max(0, math.floor((avgIlvl - 10) / 5) * 5)
         Scrappy.Print("  Suggested threshold: " .. suggestedThreshold)
@@ -162,17 +162,17 @@ function Scrappy.Gear.ShowGearAnalysis()
     end
 end
 
--- WHY: Check if equipped gear has changed significantly
+--  Check if equipped gear has changed significantly
 function Scrappy.Gear.CheckForGearChanges()
     if not ScrappyDB or not ScrappyDB.autoThreshold then return false end
     
-    -- WHY: Store last known average for comparison
+    --  Store last known average for comparison
     ScrappyDB.lastKnownAvgIlvl = ScrappyDB.lastKnownAvgIlvl or 0
     
     local currentAvg = Scrappy.Gear.GetEquippedAverageItemLevel()
     local lastAvg = ScrappyDB.lastKnownAvgIlvl
     
-    -- WHY: Consider it a significant change if avg ilvl changed by 5+ levels
+    --  Consider it a significant change if avg ilvl changed by 5+ levels
     local significantChange = math.abs(currentAvg - lastAvg) >= 5
     
     if significantChange then
@@ -183,20 +183,20 @@ function Scrappy.Gear.CheckForGearChanges()
     return false
 end
 
--- WHY: Event handler for gear changes
+--  Event handler for gear changes
 local gearFrame = CreateFrame("Frame")
 gearFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 gearFrame:RegisterEvent("PLAYER_LOGIN")
 gearFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
-        -- WHY: Update threshold on login if auto-threshold is enabled
+        --  Update threshold on login if auto-threshold is enabled
         C_Timer.After(2, function()  -- Wait for gear to load
             if ScrappyDB and ScrappyDB.autoThreshold then
                 Scrappy.Gear.UpdateAutoThreshold()
             end
         end)
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-        -- WHY: Check for gear changes when equipment changes
+        --  Check for gear changes when equipment changes
         C_Timer.After(0.5, function()  -- Small delay to let changes settle
             Scrappy.Gear.CheckForGearChanges()
         end)
