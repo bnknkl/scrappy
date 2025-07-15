@@ -10,6 +10,7 @@ Cache.lua
 Recovery.lua
 Filters.lua
 Gear.lua
+TooltipEnhancer.lua
 UI.lua
 SettingsUI.lua
 Config.lua

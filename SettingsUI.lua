@@ -56,6 +56,32 @@ local function CreateSettingsFrame()
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     
+    -- ESCAPE KEY FUNCTIONALITY
+    -- Make the frame respond to escape key
+    frame:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then
+            self:Hide()
+        end
+    end)
+    
+    -- Enable keyboard input so it can receive key events
+    frame:SetPropagateKeyboardInput(true)
+    frame:EnableKeyboard(true)
+    
+    -- Register frame for escape key handling with WoW's UI system
+    table.insert(UISpecialFrames, "ScrappySettingsFrame")
+    
+    -- Also handle show/hide events to manage keyboard focus
+    frame:SetScript("OnShow", function(self)
+        self:SetPropagateKeyboardInput(true)
+        self:EnableKeyboard(true)
+    end)
+    
+    frame:SetScript("OnHide", function(self)
+        self:SetPropagateKeyboardInput(false)
+        self:EnableKeyboard(false)
+    end)
+    
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetText("Scrappy Settings")

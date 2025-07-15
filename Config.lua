@@ -143,6 +143,30 @@ function Scrappy.Config.HandleSlashCommand(msg)
             return
         end
         
+        -- Tooltip enhancement commands
+        if msg == "tooltips on" then
+            if Scrappy.TooltipEnhancer then
+                Scrappy.TooltipEnhancer.Enable()
+            else
+                Scrappy.Print("Tooltip enhancer not loaded")
+            end
+            return
+        elseif msg == "tooltips off" then
+            if Scrappy.TooltipEnhancer then
+                Scrappy.TooltipEnhancer.Disable()
+            else
+                Scrappy.Print("Tooltip enhancer not loaded")
+            end
+            return
+        elseif msg == "tooltips toggle" then
+            if Scrappy.TooltipEnhancer then
+                Scrappy.TooltipEnhancer.Toggle()
+            else
+                Scrappy.Print("Tooltip enhancer not loaded")
+            end
+            return
+        end
+
         --  Show gear analysis
         if msg == "gear" then
             Scrappy.Gear.ShowGearAnalysis()
@@ -704,7 +728,6 @@ function Scrappy.Config.TestItemClassification(itemID)
         return
     end
     
-    local itemInfo = {itemID = itemID}
     local name, link, quality, ilvl, minLevel, class, subclass = GetItemInfo(itemID)
     
     if not name then
@@ -719,8 +742,11 @@ function Scrappy.Config.TestItemClassification(itemID)
     Scrappy.Print("  Class: " .. (class or "unknown"))
     Scrappy.Print("  Subclass: " .. (subclass or "unknown"))
     
-    --  Check if this item exists in bags and show actual vs cached ilvl
+    -- Check if this item exists in bags and get ACTUAL data using the cache system
     local foundInBags = false
+    local testItemInfo = nil
+    local actualIlvl = ilvl
+    
     for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
         local success, numSlots = pcall(C_Container.GetContainerNumSlots, bag)
         if success and numSlots then
@@ -728,12 +754,20 @@ function Scrappy.Config.TestItemClassification(itemID)
                 local containerItem = C_Container.GetContainerItemInfo(bag, slot)
                 if containerItem and containerItem.itemID == itemID then
                     foundInBags = true
-                    local link = C_Container.GetContainerItemLink(bag, slot)
-                    local actualIlvl = GetDetailedItemLevelInfo(link)
-                    Scrappy.Print("  Found in bag " .. bag .. " slot " .. slot)
-                    Scrappy.Print("  Item Level (actual): " .. (actualIlvl or "unknown"))
-                    if actualIlvl and ilvl and actualIlvl ~= ilvl then
-                        Scrappy.Print("  |cffff0000MISMATCH: Cached=" .. ilvl .. " vs Actual=" .. actualIlvl .. "|r")
+                    
+                    -- Get the REAL item info using the same cache system that selling uses
+                    testItemInfo = Scrappy.Cache.GetItemInfoFromSlot(bag, slot)
+                    if testItemInfo then
+                        actualIlvl = testItemInfo.ilvl
+                        Scrappy.Print("  Found in bag " .. bag .. " slot " .. slot)
+                        Scrappy.Print("  Item Level (actual): " .. (actualIlvl or "unknown"))
+                        
+                        -- Show mismatch if there is one
+                        if actualIlvl and ilvl and actualIlvl ~= ilvl then
+                            Scrappy.Print("  |cffff0000MISMATCH: Cached=" .. ilvl .. " vs Actual=" .. actualIlvl .. "|r")
+                        end
+                    else
+                        Scrappy.Print("  Found in bag " .. bag .. " slot " .. slot .. " but cache data not available")
                     end
                     break
                 end
@@ -744,20 +778,7 @@ function Scrappy.Config.TestItemClassification(itemID)
     
     if not foundInBags then
         Scrappy.Print("  Item not found in bags")
-    end
-    
-    --  Test if it would be sold using bag data if available
-    local testItemInfo
-    if foundInBags then
-        testItemInfo = Scrappy.Cache.GetItemInfoFromSlot and 
-            Scrappy.Cache.GetItemInfoFromSlot(bag, slot) or {
-            itemID = itemID,
-            quality = quality,
-            ilvl = ilvl,
-            name = name,
-            hasNoValue = false
-        }
-    else
+        -- Create a basic itemInfo for testing when not in bags
         testItemInfo = {
             itemID = itemID,
             quality = quality,
@@ -767,9 +788,16 @@ function Scrappy.Config.TestItemClassification(itemID)
         }
     end
     
-    local wouldSell = Scrappy.Filters.IsItemSellable(testItemInfo)
-    Scrappy.Print("  Would be sold: " .. tostring(wouldSell))
+    -- Test if it would be sold using the SAME logic path as real selling
+    if testItemInfo then
+        local wouldSell = Scrappy.Filters.IsItemSellable(testItemInfo)
+        Scrappy.Print("  Would be sold: " .. tostring(wouldSell))
+    else
+        Scrappy.Print("  Cannot test sellability - no item info available")
+    end
     
+    -- Test material classification
+    local itemInfo = {itemID = itemID}
     local materialInfo = Scrappy.Filters.GetMaterialInfo(itemInfo)
     if materialInfo then
         Scrappy.Print("  Classification: " .. materialInfo.expansion .. " " .. materialInfo.materialType)
@@ -798,6 +826,7 @@ function Scrappy.Config.ShowHelp()
     Scrappy.Print("  /scrappy scan                - Scan bags for crafting materials")
     Scrappy.Print("  /scrappy quickscan           - Quick scan (cached items only)")
     Scrappy.Print("  /scrappy precache            - Pre-cache items for better performance")
+    Scrappy.Print("  /scrappy tooltips on|off|toggle - Show/hide Scrappy status in item tooltips")
     Scrappy.Print("  /scrappy testsell            - Test what would be sold (safe preview)")
     Scrappy.Print("  /scrappy sell                - Manually trigger selling")
     Scrappy.Print("  /scrappy test [itemid]       - Test classification on specific item")
