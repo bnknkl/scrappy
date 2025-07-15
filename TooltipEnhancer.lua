@@ -240,8 +240,16 @@ local function OnTooltipSetItem(tooltip)
         return 
     end
     
-    local name, link = tooltip:GetItem()
-    if not link then return end
+    -- Safety check: only process tooltips that have GetItem method
+    if not tooltip or not tooltip.GetItem then
+        return
+    end
+    
+    -- Try to get item info, with error protection
+    local success, name, link = pcall(tooltip.GetItem, tooltip)
+    if not success or not link then 
+        return 
+    end
     
     local itemID = tonumber(link:match("item:(%d+)"))
     if not itemID then return end
@@ -319,8 +327,12 @@ local function OnTooltipSetItem(tooltip)
             color = TOOLTIP_COLOR_PROTECTED
         end
         
-        -- Add the line to tooltip
-        tooltip:AddLine(prefix .. statusInfo.reason, color[1], color[2], color[3])
+        -- Add the line to tooltip with error protection
+        local addSuccess = pcall(tooltip.AddLine, tooltip, prefix .. statusInfo.reason, color[1], color[2], color[3])
+        if not addSuccess then
+            -- Fallback: try without color if AddLine fails
+            pcall(tooltip.AddLine, tooltip, prefix .. statusInfo.reason)
+        end
     end
 end
 
@@ -354,6 +366,24 @@ local function HookTooltips()
     if TooltipDataProcessor then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnTooltipSetItem)
     else
+        -- Fallback method - only hook GameTooltip which definitely has GetItem
+        if GameTooltip and GameTooltip.SetBagItem then
+            local originalSetBagItem = GameTooltip.SetBagItem
+            GameTooltip.SetBagItem = function(self, bag, slot)
+                local result = originalSetBagItem(self, bag, slot)
+                OnTooltipSetItem(self)
+                return result
+            end
+        end
+        
+        if GameTooltip and GameTooltip.SetHyperlink then
+            local originalSetHyperlink = GameTooltip.SetHyperlink
+            GameTooltip.SetHyperlink = function(self, link)
+                local result = originalSetHyperlink(self, link)
+                OnTooltipSetItem(self)
+                return result
+            end
+        end
         -- Fallback method
         local originalSetBagItem = GameTooltip.SetBagItem
         GameTooltip.SetBagItem = function(self, bag, slot)
