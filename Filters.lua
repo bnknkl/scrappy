@@ -77,7 +77,24 @@ local function DetermineExpansion(itemInfo, ilvl, minLevel, name)
     minLevel = minLevel or 0
     local itemID = itemInfo.itemID
     
-    -- Item level ranges (most accurate for gear)
+    -- For crafting materials, prioritize item ID ranges over item level
+    -- This fixes issues where low-level materials from recent expansions
+    -- get misclassified as classic due to low item levels
+    
+    -- Item ID ranges (most reliable for crafting materials)
+    if itemID >= 210000 then return "tww" end
+    if itemID >= 190000 then return "dragonflight" end
+    if itemID >= 170000 then return "shadowlands" end  -- Shrouded Cloth (173202) should hit this
+    if itemID >= 150000 then return "bfa" end
+    if itemID >= 120000 then return "legion" end
+    if itemID >= 100000 then return "wod" end
+    if itemID >= 70000 then return "mop" end
+    if itemID >= 50000 then return "cata" end
+    if itemID >= 35000 then return "wotlk" end
+    if itemID >= 20000 then return "tbc" end
+    
+    -- Only use item level ranges as fallback for gear items
+    -- This helps with gear that might not follow strict ID ranges
     if minLevel >= 70 and ilvl >= 580 then return "tww" end
     if minLevel >= 70 and ilvl >= 550 then return "tww" end
     if minLevel >= 60 and ilvl >= 350 then return "dragonflight" end
@@ -89,20 +106,8 @@ local function DetermineExpansion(itemInfo, ilvl, minLevel, name)
     if minLevel >= 80 and ilvl >= 280 then return "cata" end
     if minLevel >= 68 and ilvl >= 200 then return "wotlk" end
     if minLevel >= 58 and ilvl >= 80 then return "tbc" end
-    if ilvl > 0 and ilvl < 80 then return "classic" end
     
-    -- Item ID ranges (fallback)
-    if itemID >= 210000 then return "tww" end
-    if itemID >= 190000 then return "dragonflight" end
-    if itemID >= 170000 then return "shadowlands" end
-    if itemID >= 150000 then return "bfa" end
-    if itemID >= 120000 then return "legion" end
-    if itemID >= 100000 then return "wod" end
-    if itemID >= 70000 then return "mop" end
-    if itemID >= 50000 then return "cata" end
-    if itemID >= 35000 then return "wotlk" end
-    if itemID >= 20000 then return "tbc" end
-    
+    -- Final fallback for very old items or edge cases
     return "classic"
 end
 
@@ -283,22 +288,43 @@ end
 -- Core filtering function with protections
 function Scrappy.Filters.IsItemSellable(itemInfo)
     -- Basic validation
-    if not itemInfo or not itemInfo.itemID then return false end
-    if itemInfo.hasNoValue then return false end
-    if not ScrappyDB then return false end
+    if not itemInfo or not itemInfo.itemID then 
+        return false 
+    end
+    if itemInfo.hasNoValue then 
+        return false 
+    end
+    if not ScrappyDB then 
+        return false 
+    end
 
     -- Get item classification first to check for consumables and profession gear
     local name, link, quality, ilvl, minLevel, class, subclass = GetItemInfo(itemInfo.itemID)
     if not name then 
-        -- Item not cached, can't determine if it's safe, so don't sell it
         return false 
+    end
+
+    -- CRITICAL FIX: Always get the actual item level from bag when possible
+    local actualIlvl = ilvl or 0
+    
+    if itemInfo.bag and itemInfo.slot then
+        local containerItemLink = C_Container.GetContainerItemLink(itemInfo.bag, itemInfo.slot)
+        if containerItemLink then
+            local detailedIlvl = GetDetailedItemLevelInfo(containerItemLink)
+            if detailedIlvl and detailedIlvl > 0 then
+                actualIlvl = detailedIlvl
+            end
+        end
+    end
+    
+    if itemInfo.ilvl and tonumber(itemInfo.ilvl) and tonumber(itemInfo.ilvl) ~= tonumber(ilvl) then
+        actualIlvl = tonumber(itemInfo.ilvl)
     end
 
     -- Check for Warbound until equipped items (if protection is enabled)
     if ScrappyDB and ScrappyDB.protectWarbound and itemInfo.bag and itemInfo.slot then
-        local isWarbound = false
         
-        -- Try modern API first, fallback to tooltip scanning
+        local isWarbound = false
         local success, result = pcall(IsWarboundUntilEquipped, itemInfo.bag, itemInfo.slot)
         if success then
             isWarbound = result
@@ -315,11 +341,12 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
         end
     end
 
-    -- Check for gear tokens (if protection is enabled)
+    -- Enhanced gear token protection (if protection is enabled)
     if ScrappyDB and ScrappyDB.protectTokens and name then
+        
         local lowerName = name:lower()
         
-        -- Token detection patterns
+        -- Comprehensive token detection patterns
         local tokenPatterns = {
             -- Classic tier token patterns
             "helm of the.*conqueror", "pauldrons of the.*conqueror", "breastplate of the.*conqueror",
@@ -329,22 +356,51 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             "helm of the.*vanquisher", "pauldrons of the.*vanquisher", "breastplate of the.*vanquisher",
             "gauntlets of the.*vanquisher", "leggings of the.*vanquisher",
             
-            -- More general token patterns
+            -- General token patterns
             ".*token", ".*insignia", ".*emblem", ".*badge", ".*seal",
             "fragment of", "shard of", "essence of.*armor", "armor.*essence",
             
-            -- Specific expansion tokens
-            "tier.*token", "set.*token", "armor.*token",
-            "conqueror.*mark", "protector.*mark", "vanquisher.*mark",
-            ".*catalyst", "revival.*catalyst", "creation.*catalyst",
+            -- Tier and set patterns
+            "tier.*token", "set.*token", "armor.*token", "tier.*fragment", "set.*fragment",
+            "tier.*shard", "set.*shard", "tier.*piece", "set.*piece",
+            
+            -- Shadowlands specific patterns
+            ".*module", "mystic.*module", ".*tier.*module", "shoulder.*module", 
+            "chest.*module", "helm.*module", "leg.*module", "glove.*module",
+            ".*nexus", ".*core", "conduit.*upgrade", "soulbind.*upgrade",
+            
+            -- Upgrade and catalyst patterns
+            ".*catalyst", "revival.*catalyst", "creation.*catalyst", "tier.*catalyst",
+            "upgrade.*crystal", "catalyst.*charge", "revival.*charge",
             
             -- Currency-like tokens that are actually items
             ".*charge", "primordial.*saronite", "runed.*orb",
             "trophy of the.*crusade", "mark of.*sanctification",
             
-            -- Modern tokens
+            -- Modern expansion patterns
             ".*cache", ".*coffer", ".*vault", ".*chest.*token",
-            ".*upgrade.*token", ".*tier.*token", ".*gear.*token"
+            ".*upgrade.*token", ".*tier.*token", ".*gear.*token",
+            
+            -- Dragonflight patterns
+            "primal.*spark", "concentrated.*primal", "shadowflame.*spark",
+            "aspect.*crest", "wyrm.*crest", "drake.*crest", "whelp.*crest",
+            "enchanted.*crest", "runed.*crest", "gilded.*crest",
+            
+            -- The War Within patterns
+            "valorstone", "weathered.*valorstone", "carved.*valorstone", "runed.*valorstone",
+            "gilded.*valorstone", ".*aspect", ".*fragment.*aspect",
+            
+            -- General upgrade materials that might be tokens
+            "upgrade.*stone", "upgrade.*gem", "upgrade.*orb",
+            "empowerment.*token", "enhancement.*token", "improvement.*token",
+            
+            -- PvP tokens
+            "conquest.*token", "honor.*token", "gladiator.*token", "elite.*token",
+            "pvp.*token", "rated.*token", "arena.*token", "battleground.*token",
+            
+            -- Mythic+ and raid tokens
+            "mythic.*token", "raid.*token", "dungeon.*token", "keystone.*token",
+            "weekly.*token", "bonus.*token", "cache.*token"
         }
         
         -- Check for token patterns
@@ -355,39 +411,111 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             end
         end
         
-        -- Additional checks for items that might be tokens but not match patterns
-        -- Look for items with no item level but high quality (likely tokens)
-        local ilvl = tonumber(itemInfo.ilvl) or 0
-        if ilvl == 0 and quality >= 3 then -- Rare or Epic with no item level
-            -- Check if it's likely a token by looking for specific keywords
-            local suspiciousKeywords = {
+        -- Enhanced detection for items that might be tokens but don't match patterns
+        local tokenQuality = quality or 0
+        local tokenIlvl = tonumber(actualIlvl) or 0
+        
+        -- Check for high-quality items with suspicious characteristics
+        if tokenQuality >= 2 then -- Uncommon or higher
+            -- Items with these keywords are likely tokens regardless of other factors
+            local highSuspicionKeywords = {
                 "tier", "set", "armor", "weapon", "trophy", "mark", "emblem", 
-                "badge", "insignia", "seal", "fragment", "shard", "essence"
+                "badge", "insignia", "seal", "fragment", "shard", "essence",
+                "upgrade", "enhancement", "improvement", "empowerment",
+                "catalyst", "spark", "crest", "valorstone", "aspect",
+                "module", "nexus", "core", "crystal", "orb", "charge"
             }
             
-            for _, keyword in ipairs(suspiciousKeywords) do
+            for _, keyword in ipairs(highSuspicionKeywords) do
                 if lowerName:find(keyword) then
-                    Scrappy.QuietPrint("PROTECTED: " .. name .. " (likely gear token - high quality, no ilvl, suspicious keyword: " .. keyword .. ")")
-                    return false
+                    
+                    -- Additional context checks to reduce false positives
+                    local contextKeywords = {
+                        "gear", "equipment", "armor", "weapon", "tier", "set",
+                        "upgrade", "token", "fragment", "shard", "piece"
+                    }
+                    
+                    local hasContext = false
+                    for _, context in ipairs(contextKeywords) do
+                        if lowerName:find(context) then
+                            hasContext = true                            break
+                        end
+                    end
+                    
+                    -- If it has suspicious keyword + context, protect it
+                    if hasContext then
+                        Scrappy.QuietPrint("PROTECTED: " .. name .. " (likely gear token - suspicious keyword: " .. keyword .. " with context)")
+                        return false
+                    end
+                    
+                    -- Even without context, protect high-quality items with very suspicious keywords
+                    local criticalKeywords = {"tier", "set", "upgrade", "catalyst", "spark", "valorstone", "module"}
+                    for _, critical in ipairs(criticalKeywords) do
+                        if keyword == critical then
+                            Scrappy.QuietPrint("PROTECTED: " .. name .. " (likely gear token - critical keyword: " .. keyword .. ")")
+                            return false
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- Special case: Epic or Legendary items with no item level are very suspicious
+        if tokenIlvl == 0 and tokenQuality >= 4 then -- Epic or Legendary with no ilvl
+            Scrappy.QuietPrint("PROTECTED: " .. name .. " (Epic/Legendary with no ilvl - likely token)")
+            return false
+        end
+        
+        -- Special case: Items with "mystic" in the name (Shadowlands tier modules)
+        if lowerName:find("mystic") then
+            Scrappy.QuietPrint("PROTECTED: " .. name .. " (contains 'mystic' - likely Shadowlands tier token)")
+            return false
+        end
+        
+        -- FIXED: Check item class/subclass for additional token indicators
+        if class then
+            local lowerClass = tostring(class):lower()
+            -- Miscellaneous items are often tokens, BUT exclude actual equipment
+            if lowerClass:find("miscellaneous") and tokenQuality >= 3 then
+                
+                -- IMPORTANT: Check if this is actually equippable gear
+                -- If it has an equipment slot, it's real gear, not a token
+                local itemEquipLoc = select(9, GetItemInfo(itemInfo.itemID))
+                
+                if itemEquipLoc and itemEquipLoc ~= "" then
+                    -- This is equippable gear (trinket, ring, etc.) - NOT a token
+                else
+                    -- This is non-equippable miscellaneous item - likely a token
+                    local miscTokenKeywords = {"upgrade", "tier", "set", "token", "fragment", "shard", "catalyst", "spark", "crest"}
+                    for _, keyword in ipairs(miscTokenKeywords) do
+                        if lowerName:find(keyword) then
+                            Scrappy.QuietPrint("PROTECTED: " .. name .. " (high-quality miscellaneous item with token keyword: " .. keyword .. ")")
+                            return false
+                        end
+                    end
                 end
             end
         end
     end
     
-    -- Check both numeric and string class values for consumables
+    -- Enhanced consumable protection - allow junk-quality consumables
     if class == 0 or class == "Consumable" then
-        -- Allow junk-quality consumables to be sold (they're vendor trash)
-        if quality == 0 then
-            Scrappy.QuietPrint("Allowing junk consumable: " .. (name or "Unknown Item"))
-            -- Continue with normal filtering
+        
+        local consumableQuality = quality or 0
+        
+        -- Allow junk-quality consumables to be sold (they're usually vendor trash)
+        if consumableQuality == 0 then
+            Scrappy.QuietPrint("Allowing junk consumable: " .. (name or "Unknown Item") .. " (quality 0, class=" .. tostring(class) .. ")")
+            -- Continue with normal filtering logic instead of returning false
         else
+            -- For higher quality consumables, still protect them
             Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (consumable, class=" .. tostring(class) .. ")")
             return false
         end
     end
     
     -- Never sell profession equipment
-    if class == 7 or class == "Trade Goods" then
+    if class == 7 or class == "Trade Goods" then       
         -- Profession Tools subclass
         if subclass == 12 or subclass == "Device" or subclass == "Devices" then
             Scrappy.QuietPrint("PROTECTED: " .. (name or "Unknown Item") .. " (profession tool)")
@@ -404,7 +532,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
     -- Enhanced name-based protection for profession equipment that might slip through
     if name then
         local lowerName = name:lower()
-        
+                
         -- Consumable keywords - use word boundaries to avoid false matches
         local consumableKeywords = {
             "flask", "potion", "elixir", "food", "drink", "scroll", "bandage", 
@@ -429,11 +557,14 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
             "inscription.*quill", "scribing.*tool", "vellum"
         }
         
-        -- Check for consumable keywords
-        for _, keyword in ipairs(consumableKeywords) do
-            if lowerName:find(keyword) then
-                Scrappy.QuietPrint("PROTECTED: " .. name .. " (consumable keyword: " .. keyword .. ")")
-                return false
+        -- Check for consumable keywords (but only if not already handled above)
+        local itemQuality = quality or 0
+        if itemQuality > 0 then -- Only check if not junk quality (junk consumables allowed above)
+            for _, keyword in ipairs(consumableKeywords) do
+                if lowerName:find(keyword) then
+                    Scrappy.QuietPrint("PROTECTED: " .. name .. " (consumable keyword: " .. keyword .. ")")
+                    return false
+                end
             end
         end
         
@@ -466,9 +597,9 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
     end
 
     -- Check quality filters first (this determines base sellability)
-    local quality = itemInfo.quality or 0
-    local qualityAllowsSelling = ScrappyDB and ScrappyDB.qualityFilter and ScrappyDB.qualityFilter[quality]
-    
+    local itemQuality = quality or 0
+    local qualityAllowsSelling = ScrappyDB and ScrappyDB.qualityFilter and ScrappyDB.qualityFilter[itemQuality]
+        
     -- If quality doesn't allow selling, don't sell regardless of item level
     if not qualityAllowsSelling then
         return false
@@ -481,7 +612,7 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
 
     -- IMPORTANT: Check material protection BEFORE item level threshold
     -- Materials should be protected regardless of their item level
-    if ScrappyDB and ScrappyDB.materialFilters then
+    if ScrappyDB and ScrappyDB.materialFilters then        
         local classification = GetItemClassification(itemInfo)
         if classification and classification.isCraftingMaterial and classification.expansion then
             local isProtected = ScrappyDB.materialFilters[classification.expansion]
@@ -493,11 +624,11 @@ function Scrappy.Filters.IsItemSellable(itemInfo)
 
     -- Check item level threshold (only if quality allows selling and materials aren't protected)
     local ilvlThreshold = (ScrappyDB and ScrappyDB.ilvlThreshold) or 0
-    local ilvl = tonumber(itemInfo.ilvl) or 0
-    
+    local itemIlvl = tonumber(actualIlvl) or 0
+        
     -- If threshold is set and item has level, use threshold logic
-    if ilvlThreshold > 0 and ilvl > 0 then
-        if ilvl <= ilvlThreshold then
+    if ilvlThreshold > 0 and itemIlvl > 0 then
+        if itemIlvl <= ilvlThreshold then
             return true  -- Sell items at or below threshold
         else
             return false -- Don't sell items above threshold
